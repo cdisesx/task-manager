@@ -8,7 +8,14 @@ from pathlib import Path
 from utils import now_iso, now_stamp, resolve_session_id
 from utils import read_data, write_data, scan_all_session_tasks
 from utils import get_tasks_path, get_memory_dir, get_tasks_dir
-from core.prompts import render_prompt
+from core.prompts import (
+    render_prompt,
+    render_plan_task,
+    render_split_tasks,
+    render_execute_task,
+    render_verify_task,
+    render_list_tasks,
+)
 
 
 def cmd_get_session_id(agent: str, args):
@@ -37,7 +44,7 @@ def cmd_plan_task(agent: str, args):
     write_data(agent, data, sid)
     print(f"[OK] 已设置用户需求（session: {sid}）：\n{req}")
     print()
-    print(render_prompt("plan_task", req=req, tasks=data["tasks"]))
+    print(render_plan_task(req=req, tasks=data["tasks"]))
 
 
 def cmd_split_tasks(agent: str, args):
@@ -136,7 +143,7 @@ def cmd_split_tasks(agent: str, args):
         if not td.get("verificationCriteria"):
             missing_fields.append("verificationCriteria")
         if missing_fields:
-            print(f"[WARNING] 任务 \"{td.get('name', '')}\" 缺少字段：{', '.join(missing_fields)}")
+            print(f"[WARNING] 任务 \"{td.get('name', '')}\" 缺少字段：{', '.join(missing_fields)}。补充这些字段可提升向量记忆质量，详见 task_fields_guide。")
         tid = str(uuid.uuid4())
         name_to_id[td["name"]] = tid
         task = {
@@ -162,7 +169,7 @@ def cmd_split_tasks(agent: str, args):
     for t in created:
         print(f"  [{t['id'][:8]}] {t['name']}")
     print()
-    print(render_prompt("split_tasks", mode=mode, created=created))
+    print(render_split_tasks(mode=mode, created=created))
 
 
 def cmd_list_tasks(agent: str, args):
@@ -223,7 +230,7 @@ def cmd_list_tasks(agent: str, args):
     if not tasks:
         print("（暂无任务）")
     print()
-    print(render_prompt("list_tasks", tasks=tasks, status_filter=status_filter))
+    print(render_list_tasks(tasks=tasks, status_filter=status_filter))
 
 
 def cmd_claim_task(agent: str, args):
@@ -326,12 +333,12 @@ def cmd_execute_task(agent: str, args):
         sys.exit(1)
     missing = [f for f in ["implementationGuide", "verificationCriteria", "relatedFiles"] if not task.get(f)]
     if missing:
-        print(f"[WARNING] 任务上下文不足，缺少字段：{', '.join(missing)}")
+        print(f"[WARNING] 任务上下文不足，缺少字段：{', '.join(missing)}。建议在执行前使用 update-task 补充，各字段说明请参考 task_fields_guide。")
     task["status"] = "in_progress"
     task["updatedAt"] = now_iso()
     write_data(agent, data, sid)
     print()
-    print(render_prompt("execute_task", task=task, id_map=id_map))
+    print(render_execute_task(task=task, id_map=id_map))
 
 
 def cmd_verify_task(agent: str, args):
@@ -363,7 +370,7 @@ def cmd_verify_task(agent: str, args):
     if getattr(args, 'summary', None):
         print(f"\n验证说明：{args.summary}")
     print()
-    print(render_prompt("verify_task", task=task, all_tasks=data["tasks"]))
+    print(render_verify_task(task=task, all_tasks=data["tasks"]))
 
 
 def cmd_complete_task(agent: str, args):
@@ -391,7 +398,7 @@ def cmd_complete_task(agent: str, args):
             print(f"[WARN] --work-log JSON 解析失败，已忽略：{e}")
     write_data(agent, data, sid)
     if not task.get("relatedFiles"):
-        print(f"[REMIND] 任务 \"{task['name']}\" 完成时 relatedFiles 为空")
+        print(f"[REMIND] 任务 \"{task['name']}\" 完成时 relatedFiles 为空。记录关联文件可提升向量记忆检索质量。")
     print(f"[OK] 任务已完成：{task['name']}\n摘要：{args.summary}")
     if getattr(args, 'skip_memory', False):
         return

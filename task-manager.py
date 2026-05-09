@@ -126,6 +126,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("add-subtask")
     s.add_argument("--parent-id", dest="parent_id", required=True)
     s.add_argument("--name", required=True); s.add_argument("--desc", required=True)
+    s.add_argument("--guide", default=None, help="实现指引")
+    s.add_argument("--criteria", default=None, help="验证标准")
+    s.add_argument("--notes", default=None, help="备注")
 
     s = sub.add_parser("resplit-task")
     s.add_argument("--id", required=True); s.add_argument("--tasks", required=True)

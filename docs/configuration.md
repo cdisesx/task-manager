@@ -1,24 +1,31 @@
-# Configuration — task-manager
+# 配置说明 — task-manager
 
-All runtime configuration lives in `config/config.json`.
-Create it by copying `config/config.example.json`.
+所有运行时配置位于 `config/config.json`。首次使用请复制模板：
+
+```bash
+cp config/config.example.json config/config.json
+# Windows PowerShell
+# Copy-Item config/config.example.json config/config.json
+```
+
+`config.json` 已被 `.gitignore` 忽略，不会提交到版本库。
 
 ---
 
-## Full example
+## 完整示例
 
 ```json
 {
-  "basedir": "/path/to/your/object",
-  "agents": ["agent1", "agent2"],
-  "log": {
-    "dir": "logs",
-    "filename": "task-manager.log"
-  },
+  "base_dir": "Y:\\wpAI\\skills\\task-manager",
+  "agents": [
+    {
+      "name": "代理名称",
+      "id": "agent-id",
+      "workSpace": "Y:\\path\\to\\agent\\workspace"
+    }
+  ],
   "dashboard": {
-    "port": 3010,
-    "python_path": "python",
-    "task_manager_script": "task-manager.py"
+    "port": 3010
   },
   "vector_memory": {
     "enabled": false,
@@ -30,57 +37,111 @@ Create it by copying `config/config.example.json`.
 
 ---
 
-## Fields
+## 字段说明
 
-### Top-level
+### 顶层字段
 
-| Field | Type | Required | Description |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `base_dir` | string | 是 | 项目根目录。仅当 agents 未配置 workSpace 时，作为 workspace 路径的基础目录 |
+| `agents` | object[] | 是 | 代理列表。每个代理为一个对象（详见下方） |
+
+### agents[]
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 代理显示名称（看板上显示的名称） |
+| `id` | string | 是 | 代理标识符（CLI 中 `--agent` 参数使用的值） |
+| `workSpace` | string | 否 | 该代理的任务文件存放目录。若未设置，则回退为 `{base_dir}/workspace/{agent.id}` |
+
+示例：
+
+```json
+{
+  "agents": [
+    { "name": "林殊", "id": "linshu", "workSpace": "Y:\\projects\\workspace\\linshu" },
+    { "name": "飞流", "id": "feiliu", "workSpace": "Y:\\projects\\workspace\\feiliu" }
+  ]
+}
+```
+
+### dashboard
+
+| 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `basedir` | string | yes | Root OpenClaw directory. Task files are stored under `{basedir}/workspace/{agent}/tasks/` |
-| `agents` | string[] | yes | Agent names displayed and allowed by the dashboard/CLI environment |
+| `port` | number | `3010` | Dashboard HTTP 服务端口 |
 
-### `log`
+### vector_memory
 
-| Field | Type | Default | Description |
+| 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `log.dir` | string | `logs` | Log directory relative to the project root |
-| `log.filename` | string | `task-manager.log` | Log filename |
-
-### `dashboard`
-
-| Field | Type | Default | Description |
-|------|------|--------|------|
-| `dashboard.port` | number | `3010` | HTTP port used by the dashboard |
-| `dashboard.python_path` | string | `python` | Python executable used by dashboard server hooks |
-| `dashboard.task_manager_script` | string | `task-manager.py` | Relative path to the CLI entry script |
-
-### `vector_memory`
-
-| Field | Type | Default | Description |
-|------|------|--------|------|
-| `vector_memory.enabled` | boolean | `false` | If false, vector-memory integration is skipped silently |
-| `vector_memory.service_url` | string | `http://localhost:3019` | Vector-memory service endpoint |
-| `vector_memory.skill_path` | string | `""` | Absolute or project-relative path to the vector-memory skill |
+| `enabled` | boolean | `false` | 是否启用向量记忆集成。false 时所有记忆钩子静默跳过 |
+| `service_url` | string | `http://localhost:3019` | 向量记忆嵌入服务地址 |
+| `skill_path` | string | `""` | 向量记忆扩展的路径（绝对或相对路径） |
 
 ---
 
-## Optional dependency behavior
+## 配置优先级
 
-When `vector_memory.enabled` is `false`, all vector-memory hooks must be skipped without raising runtime errors.
-When it is `true`, make sure the related service is reachable and the skill path is valid.
+1. **环境变量 `TASK_MANAGER_CONFIG`** — 若设置了此环境变量，CLI 会优先读取其指向的配置文件
+2. **默认路径** — `config/config.json`
+3. **回退** — `config/config.example.json`（仅提供默认值，不保证完整）
 
 ---
 
-## Data paths
+## 数据路径
 
-Task files are stored at:
+### 任务文件
 
-```text
-{basedir}/workspace/{agent}/tasks/tasks-{sessionId}.json
+```
+{agent.workSpace}/tasks/tasks-{sessionId}.json
 ```
 
-Example:
+若未配置 `workSpace`，则回退为：
 
-```text
-/path/to/your/object/workspace/{agent}/tasks/tasks-si-20260415135839-d1c6011f.json
 ```
+{base_dir}/workspace/{agentId}/tasks/tasks-{sessionId}.json
+```
+
+### 任务文件结构
+
+```json
+{
+  "userRequirement": "用户需求描述",
+  "tasks": [],
+  "ownerSession": "si-20260509135839-d1c6011f",
+  "sessionHistory": [],
+  "lastUpdatedAt": "2026-05-09T13:58:39"
+}
+```
+
+### 归档路径
+
+```
+{agent.workSpace}/tasks/memory/
+```
+
+完成归档后的任务文件会被移至此目录，文件名保持不变（`tasks-si-{timestamp}-{hash}.json`）。
+
+### Todo 文件
+
+```
+{agent.workSpace}/tasks/todo-{sessionId}.json
+```
+
+### 日志路径
+
+```
+logs/task-manager.log
+```
+
+日志由 `task-manager.py` 自动创建，使用标准 logging 模块输出到 `logs/task_manager.log`，同时输出到 stderr。
+
+---
+
+## 环境变量覆盖
+
+| 环境变量 | 作用 |
+|----------|------|
+| `TASK_MANAGER_CONFIG` | 覆盖 config.json 的路径。设置为绝对路径，指向另一个配置文件 |
+| `PORT` | 覆盖 Dashboard 端口（优先级高于 config.json 中的 `dashboard.port`） |

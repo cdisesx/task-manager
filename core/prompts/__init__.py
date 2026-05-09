@@ -4,14 +4,14 @@ from pathlib import Path
 _PROMPTS_DIR = Path(__file__).parent
 
 
-def _load(name: str) -> str:
-    p = _PROMPTS_DIR / f"{name}.md"
+def _load(template_name: str) -> str:
+    p = _PROMPTS_DIR / f"{template_name}.md"
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
-def render_prompt(name: str, **kwargs) -> str:
+def render_prompt(template_name: str, **kwargs) -> str:
     """加载并渲染提示词模板，支持 {key} 占位符替换"""
-    tpl = _load(name)
+    tpl = _load(template_name)
     for k, v in kwargs.items():
         tpl = tpl.replace("{" + k + "}", str(v) if v is not None else "")
     # 清理未替换的占位符
@@ -59,7 +59,11 @@ def render_split_tasks(mode: str, created: list) -> str:
             lines.append(f"**验证标准:** {t['verificationCriteria'][:100]}")
         lines.append(f"**{dep_str}**")
         lines.append("")
-    return render_prompt("split_tasks", mode=mode, task_list="\n".join(lines))
+    return render_prompt("split_tasks", mode=mode, task_list="\n".join(lines)) + "\n\n" + render_fields_guide()
+
+
+def render_fields_guide() -> str:
+    return render_prompt("task_fields_guide")
 
 
 def render_execute_task(task: dict, id_map: dict) -> str:
@@ -102,7 +106,7 @@ def render_execute_task(task: dict, id_map: dict) -> str:
         complexity=complexity,
         desc_len=desc_len,
         dep_count=dep_count,
-    )
+    ) + "\n\n" + render_fields_guide()
 
 
 def render_verify_task(task: dict, all_tasks: list) -> str:

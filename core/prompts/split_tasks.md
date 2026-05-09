@@ -6,6 +6,14 @@
 3. 按开发阶段分解 - 遵循开发流程，优化功能和测试
 4. 按前后分解 - 前后端分离，保持接口同步
 
+**字段指南：** 每个任务应尽可能完善以下字段以提升向量记忆质量：
+- `implementationGuide` — 实现指引（缺失时会收到 WARNING）
+- `verificationCriteria` — 验证标准（缺失时会收到 WARNING）
+- `relatedFiles` — 关联文件列表
+- `notes` — 备注、约束条件
+- `analysisResult` — 分析结果、架构决策
+详细说明请参考 `task_fields_guide`。
+
 **任务列表：**
 
 {task_list}

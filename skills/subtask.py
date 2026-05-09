@@ -21,6 +21,13 @@ def cmd_add_subtask(agent: str, args):
         "createdAt": now_iso(),
         "parentId": parent["id"],
     }
+    # 补充可选字段
+    if getattr(args, 'guide', None):
+        subtask["implementationGuide"] = args.guide
+    if getattr(args, 'criteria', None):
+        subtask["verificationCriteria"] = args.criteria
+    if getattr(args, 'notes', None):
+        subtask["notes"] = args.notes
     parent.setdefault("subtasks", []).append(subtask)
     parent["updatedAt"] = now_iso()
     write_data(agent, data, sid)
@@ -67,6 +74,7 @@ def cmd_resplit_task(agent: str, args):
             "relatedFiles": td.get("relatedFiles", []),
             "implementationGuide": td.get("implementationGuide"),
             "verificationCriteria": td.get("verificationCriteria"),
+            "analysisResult": td.get("analysisResult"),
             "workLog": [],
         }
         created.append(task)
