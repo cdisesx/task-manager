@@ -6,11 +6,20 @@ import os
 import sys
 from pathlib import Path
 
-# 强制 UTF-8 输出
-if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-if sys.stderr.encoding and sys.stderr.encoding.lower() != 'utf-8':
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+# 强制 UTF-8 输出（带 fallback 保护）
+def _ensure_utf8_stdio():
+    for stream_name in ('stdout', 'stderr', 'stdin'):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+        try:
+            enc = getattr(stream, 'encoding', None)
+            if enc and enc.lower() != 'utf-8':
+                stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
+_ensure_utf8_stdio()
 
 # 将当前目录加入 sys.path，确保模块可导入
 _HERE = Path(__file__).parent
@@ -156,7 +165,26 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("list-todos")
     s.add_argument("--status", default="all", choices=["all", "pending", "planned", "assigned"])
 
+    s = sub.add_parser("encoding-info")
+    s.add_argument("--verbose", action="store_true", help="显示详细编码信息")
+
     return p
+
+
+def cmd_encoding_info(agent: str, args):
+    import locale
+    print(f"[ENCODING] fs: {sys.getfilesystemencoding()}")
+    print(f"[ENCODING] stdin: {getattr(sys.stdin, 'encoding', 'N/A')}")
+    print(f"[ENCODING] stdout: {getattr(sys.stdout, 'encoding', 'N/A')}")
+    print(f"[ENCODING] stderr: {getattr(sys.stderr, 'encoding', 'N/A')}")
+    print(f"[ENCODING] PYTHONUTF8: {os.environ.get('PYTHONUTF8', '(not set)')}")
+    print(f"[ENCODING] PYTHONIOENCODING: {os.environ.get('PYTHONIOENCODING', '(not set)')}")
+    if getattr(args, 'verbose', False):
+        print(f"[ENCODING] default: {sys.getdefaultencoding()}")
+        print(f"[ENCODING] os.name: {os.name}")
+        print(f"[ENCODING] locale: {locale.getlocale()}")
+        print(f"[ENCODING] preferred: {locale.getpreferredencoding()}")
+        print(f"[ENCODING] filesystem errors: {sys.getfilesystemencodeerrors()}")
 
 
 DISPATCH = {
@@ -173,10 +201,15 @@ DISPATCH = {
     "add-work-log": cmd_add_work_log, "cancel-task": cmd_cancel_task,
     "create-todo": cmd_create_todo, "plan-from-todo": cmd_plan_from_todo,
     "assign-task": cmd_assign_task, "list-todos": cmd_list_todos,
+    "encoding-info": cmd_encoding_info,
 }
 
 
 def main():
+    # Windows 下自动启用 UTF-8 模式（如果尚未设置）
+    if os.name == 'nt':
+        os.environ.setdefault('PYTHONUTF8', '1')
+
     parser = build_parser()
     args = parser.parse_args()
     if not args.command:

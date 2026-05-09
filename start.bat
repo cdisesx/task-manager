@@ -1,5 +1,6 @@
 @echo off
 setlocal
+set PYTHONUTF8=1
 set SCRIPT_DIR=%~dp0
 
 if not exist "%SCRIPT_DIR%config\config.json" (

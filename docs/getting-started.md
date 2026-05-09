@@ -576,3 +576,5 @@ python task-manager.py --agent myagent --session-id $sid archive --confirm
 | Dashboard 无法访问 | 确认 `node server.js` 正在运行，端口未被占用 |
 | 向量记忆不生效 | 检查 `config.json` 中 `vector_memory.enabled` 是否为 `true` |
 | 归档命令报错 | 需要添加 `--confirm` 参数确认归档操作 |
+| 输出中文乱码或 `UnicodeEncodeError` | 运行 `set PYTHONUTF8=1`（cmd）或 `$env:PYTHONUTF8=1`（PowerShell），然后重试。或使用 `python -X utf8 task-manager.py ...`。启动脚本已自动设置此变量 |
+| 想知道当前编码设置 | 运行 `python task-manager.py --agent test encoding-info` 查看 |
