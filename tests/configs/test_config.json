@@ -1,0 +1,14 @@
+{
+  "base_dir": "__TMP_BASE__",
+  "agents": [
+    { "id": "demo_agent", "workSpace": "__TMP_WS__" }
+  ],
+  "dashboard": {
+    "port": 0
+  },
+  "vector_memory": {
+    "enabled": false,
+    "service_url": "",
+    "skill_path": ""
+  }
+}

@@ -1,0 +1,2509 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>琅琊阁 · 任务看板</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header .header-center { flex: 1; text-align: center; }
+  header h1 { font-size: 22px; font-weight: 700; color: #a78bfa; letter-spacing: 2px; margin: 0; }
+  header .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; letter-spacing: 1px; }
+  .refresh-info { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 10px; }
+  .refresh-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; border: 1px solid #166534; background: rgba(34, 197, 94, 0.16); color: #dcfce7; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .2s, border-color .2s, color .2s, opacity .2s, box-shadow .2s; box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08); }
+  .refresh-toggle:hover { opacity: .95; box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.18), 0 6px 14px rgba(15, 23, 42, 0.22); }
+  .refresh-toggle.is-paused { border-color: #991b1b; background: rgba(239, 68, 68, 0.14); color: #fee2e2; box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.1); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+  .refresh-toggle.is-paused .dot { background: #ef4444; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  #sg-grid { grid-template-columns: repeat(3, 1fr); }
+  .card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 20px; transition: border-color .2s, transform .2s; }
+  .card:hover { border-color: #7c3aed; transform: translateY(-2px); }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .agent-name { font-size: 16px; font-weight: 600; color: #c4b5fd; }
+  .status-badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; flex-shrink: 0; margin-left: 8px; }
+  .status-active { background: #14532d; color: #4ade80; }
+  .status-idle { background: #1e293b; color: #64748b; }
+  .status-done { background: #14532d; color: #4ade80; }
+  .status-blocked { background: #431407; color: #fb923c; }
+  .status-disconnected { background: #450a0a; color: #f87171; }
+  .blocked-banner { font-size: 12px; color: #fb923c; background: #431407; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; }
+  .disconnected-banner { font-size: 12px; color: #f87171; background: #450a0a; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; word-break: break-all; }
+  .req-text { font-size: 12px; color: #94a3b8; margin-bottom: 14px; line-height: 1.5; }
+  .progress-bar-wrap { background: #0f1117; border-radius: 6px; height: 8px; margin-bottom: 10px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #7c3aed, #a78bfa); transition: width .5s; }
+  .progress-text { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+  .task-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; min-height: 28px; }
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+  .chip-done { background: #14532d; color: #4ade80; }
+  .chip-run { background: #1e3a5f; color: #60a5fa; }
+  .chip-pending { background: #1e293b; color: #94a3b8; }
+  .card-footer { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 8px 12px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity .2s; }
+  .btn:hover { opacity: .85; }
+  .btn-detail { background: #2d3148; color: #c4b5fd; }
+  .btn-archive { background: #1e293b; color: #f59e0b; border: 1px solid #92400e; }
+  .btn-archive:hover { background: #292524; opacity: 1; }
+  .btn-archive:disabled { opacity: .5; cursor: not-allowed; }
+  /* 确认弹窗 */
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 200; display: flex; align-items: center; justify-content: center; }
+  .confirm-overlay.hidden { display: none; }
+  .confirm-modal { background: #1a1d2e; border: 1px solid #92400e; border-radius: 14px; padding: 28px 28px 22px; width: 400px; max-width: 92vw; }
+  .confirm-modal p { font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 20px; }
+  .confirm-modal .confirm-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .confirm-modal .confirm-btns button { padding: 8px 20px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-cancel { background: #2d3148; color: #94a3b8; }
+  .btn-confirm { background: #b45309; color: #fff; }
+  .empty { text-align: center; color: #475569; padding: 60px 0; font-size: 14px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 12px 18px; font-size: 13px; color: #e2e8f0; z-index: 999; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok { border-color: #22c55e; color: #4ade80; }
+  .toast.err { border-color: #ef4444; color: #f87171; }
+  .countdown { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 74px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(71, 85, 105, 0.55); background: linear-gradient(180deg, rgba(19, 28, 45, 0.96), rgba(10, 16, 28, 0.98)); color: #cbd5e1; font-size: 12px; font-weight: 600; line-height: 1; letter-spacing: 0; font-family: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", Consolas, monospace; font-variant-numeric: tabular-nums; box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08), 0 8px 18px rgba(2, 6, 23, 0.24); position: relative; overflow: hidden; text-align: center; }
+  .countdown::before { content: ""; position: absolute; inset: 1px; border-radius: inherit; background: linear-gradient(90deg, rgba(56,189,248,0.08), rgba(37,99,235,0.03) 45%, rgba(56,189,248,0.1)); opacity: .85; pointer-events: none; }
+  .countdown::after { content: ""; position: absolute; left: 10px; right: 10px; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.4), transparent); opacity: .75; pointer-events: none; }
+  .countdown-icon, .countdown-text { position: relative; z-index: 1; }
+  .countdown-icon { font-size: 11px; opacity: .78; transform: translateY(-.5px); }
+  .countdown-text { display: inline-flex; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+  .countdown-value { font-size: 13px; font-weight: 700; color: #67e8f9; letter-spacing: .02em; min-width: 2ch; text-align: center; text-shadow: 0 0 8px rgba(103, 232, 249, 0.22); }
+  .countdown-unit { font-size: 10px; font-weight: 600; color: #7dd3fc; opacity: .82; letter-spacing: .04em; text-transform: lowercase; }
+  .countdown.is-paused { color: #fecaca; border-color: rgba(248, 113, 113, 0.35); box-shadow: inset 0 1px 0 rgba(248, 113, 113, 0.08), 0 8px 18px rgba(69, 10, 10, 0.16); }
+  .countdown.is-paused::before { background: linear-gradient(90deg, rgba(248,113,113,0.08), rgba(127,29,29,0.03) 45%, rgba(248,113,113,0.1)); }
+  .countdown.is-paused .countdown-value,
+  .countdown.is-paused .countdown-unit,
+  .countdown.is-paused .countdown-icon { color: #fca5a5; text-shadow: none; }
+  /* Tab 样式 */
+  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; max-width: 1200px; margin: 0 auto; }
+  .tab-btn { padding: 8px 20px; border-radius: 8px 8px 0 0; border: 1px solid #2d3148; border-bottom: none; background: #0f1117; color: #64748b; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; }
+  .tab-btn.active { background: #1a1d2e; color: #a78bfa; border-color: #7c3aed; }
+  .tab-btn:hover:not(.active) { color: #94a3b8; }
+  /* 服务管理 */
+  .service-panel { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 20px; margin-top: 16px; }
+  .service-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .service-title { font-size: 18px; font-weight: 600; color: #c4b5fd; letter-spacing: 1px; }
+  .service-desc { font-size: 13px; color: #94a3b8; margin-top: 6px; line-height: 1.5; }
+  .service-refresh { display: flex; align-items: center; gap: 10px; }
+  .service-table-wrap { overflow-x: auto; border: 1px solid #2d3148; border-radius: 10px; }
+  .services-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  .services-table th, .services-table td { padding: 10px 12px; border-bottom: 1px solid #2d3148; font-size: 13px; text-align: left; }
+  .services-table tr.service-row:hover td { background: #1e2235; }
+  .services-table th { background: #111428; color: #a78bfa; position: sticky; top: 0; z-index: 1; }
+  .services-table tr:last-child td { border-bottom: none; }
+  .service-name { font-weight: 600; color: #e2e8f0; }
+  .service-type { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; display: inline-block; }
+  .service-type-host { background: #1e293b; color: #60a5fa; }
+  .service-type-docker { background: #1e3a5f; color: #5eead4; }
+  .service-status { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .service-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .service-status-running .service-status-dot { background: #22c55e; animation: svc-pulse 2s infinite; }
+  .service-status-running { color: #4ade80; }
+  .service-status-stopped .service-status-dot { background: #6b7280; }
+  .service-status-stopped { color: #9ca3af; }
+  .service-status-unknown .service-status-dot { background: #f59e0b; }
+  .service-status-unknown { color: #fbbf24; }
+  @keyframes svc-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .service-empty { text-align: center; padding: 40px 0; color: #475569; }
+  .btn-service-kill { padding: 6px 12px; border-radius: 6px; border: 1px solid #7f1d1d; background: #1c0a0a; color: #f87171; font-size: 12px; cursor: pointer; }
+  .btn-service-kill:hover:not([disabled]) { background: #450a0a; }
+  .btn-service-kill[disabled] { opacity: .5; cursor: not-allowed; }
+  .btn-service-delete { padding: 6px 12px; border-radius: 6px; border: 1px solid #7f1d1d; background: #1c0a0a; color: #f87171; font-size: 12px; cursor: pointer; margin-left: 4px; }
+  .btn-service-delete:hover { background: #450a0a; }
+  .service-note { margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.6; }
+  .service-name small { display: block; font-size: 11px; color: #94a3b8; font-weight: 400; margin-top: 4px; }
+  /* 历史任务 - 分组卡片布局 */
+  .history-groups { display: flex; flex-direction: column; gap: 28px; }
+  .history-group { }
+  .history-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #2d3148; }
+  .history-group-name { font-size: 16px; font-weight: 600; color: #a78bfa; }
+  .history-group-count { font-size: 12px; color: #64748b; background: #1e293b; padding: 2px 8px; border-radius: 10px; }
+  .history-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .history-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 16px 18px; cursor: pointer; transition: border-color .2s, transform .2s; }
+  .history-card:hover { border-color: #7c3aed; transform: translateY(-2px); }
+  .history-card-desc { font-size: 13px; color: #c4b5fd; font-weight: 500; line-height: 1.5; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .history-card-desc.expanded { -webkit-line-clamp: unset; overflow: visible; }
+  .history-card-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .h-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .h-badge-done { background: #14532d; color: #4ade80; }
+  .h-badge-timeout { background: #451a03; color: #fb923c; }
+  .h-badge-error { background: #450a0a; color: #f87171; }
+  .h-badge-default { background: #1e293b; color: #94a3b8; }
+  .h-badge-incomplete { background: #1e3a5f; color: #60a5fa; }
+  .h-badge-blocked { background: #3b1f00; color: #f59e0b; }
+  .history-task-detail { margin-top: 12px; border-top: 1px solid #2d3148; padding-top: 10px; display: none; }
+  .history-task-detail.open { display: block; }
+  .history-task-item { padding: 8px 10px; border-radius: 8px; background: #0f1117; margin-bottom: 6px; border-left: 3px solid #2d3148; }
+  .history-task-item.status-completed { border-left-color: #4ade80; }
+  .history-task-item.status-in_progress { border-left-color: #60a5fa; }
+  .history-task-item.status-pending { border-left-color: #94a3b8; }
+  .history-task-item.status-blocked { border-left-color: #f59e0b; }
+  .history-task-item.status-cancelled { border-left-color: #475569; }
+  .history-task-name { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 3px; }
+  .history-task-desc { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+  .history-task-summary { font-size: 11px; color: #a78bfa; font-style: italic; }
+  .history-task-status { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; display: inline-block; margin-bottom: 4px; }
+  .ts-completed { background: #14532d; color: #4ade80; }
+  .ts-in_progress { background: #1e3a5f; color: #60a5fa; }
+  .ts-pending { background: #1e293b; color: #94a3b8; }
+  .ts-blocked { background: #3b1f00; color: #f59e0b; }
+  .ts-cancelled { background: #1e293b; color: #475569; }
+  .h-meta-item { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 3px; }
+  .h-meta-sep { color: #2d3148; }
+  /* 搜索栏 */
+  .history-search { margin-bottom: 18px; }
+  .history-search input { width: 100%; padding: 9px 14px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; transition: border-color .2s; }
+  .history-search input:focus { border-color: #7c3aed; }
+  .history-search input::placeholder { color: #475569; }
+  /* 历史分页控件 */
+  .history-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; padding: 10px 0 4px; }
+  .history-pagination .pg-btn { background: #2d3148; color: #c4b5fd; border: 1px solid #3d4168; border-radius: 6px; padding: 5px 14px; font-size: 12px; cursor: pointer; transition: background .2s, opacity .2s; }
+  .history-pagination .pg-btn:hover:not(:disabled) { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .history-pagination .pg-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .history-pagination .pg-info { font-size: 12px; color: #94a3b8; min-width: 80px; text-align: center; }
+  /* 时间轴切换与视图 */
+  .history-view-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+  .history-view-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid #2d3148; background: #0f1117; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; }
+  .history-view-btn:hover { color: #c4b5fd; border-color: #7c3aed; }
+  .history-view-btn.active { background: #1a1d2e; color: #a78bfa; border-color: #7c3aed; box-shadow: 0 0 0 1px rgba(124,58,237,.2); }
+  .history-timeline { display: none; flex-direction: column; gap: 20px; }
+  .timeline-agent-block { background: #111428; border: 1px solid #2d3148; border-radius: 12px; padding: 18px 20px; }
+  .timeline-agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .timeline-agent-name { font-size: 16px; font-weight: 600; color: #a78bfa; }
+  .timeline-agent-count { font-size: 12px; color: #64748b; background: #1e293b; padding: 2px 10px; border-radius: 999px; }
+  .timeline-day { position: relative; padding-left: 28px; margin-bottom: 16px; }
+  .timeline-day:last-child { margin-bottom: 0; }
+  .timeline-day::before { content: ""; position: absolute; left: 14px; top: 8px; bottom: 6px; width: 2px; background: #2d3148; }
+  .timeline-day-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .timeline-day-label { font-size: 14px; font-weight: 600; color: #c4b5fd; }
+  .timeline-day-count { font-size: 11px; color: #94a3b8; background: #0f1117; border: 1px solid #2d3148; padding: 1px 8px; border-radius: 999px; }
+  .timeline-item { position: relative; margin-bottom: 12px; padding: 12px 14px 12px 24px; border-radius: 10px; background: #1a1d2e; border: 1px solid #2d3148; cursor: pointer; transition: border-color .2s, transform .2s; }
+  .timeline-item:hover { border-color: #7c3aed; transform: translateX(2px); }
+  .timeline-item::before { content: ""; position: absolute; left: 8px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: #2d3148; box-shadow: 0 0 0 2px #0f1117; }
+  .timeline-item.status-done::before { background: #4ade80; }
+  .timeline-item.status-blocked::before { background: #fb923c; }
+  .timeline-item.status-error::before { background: #f87171; }
+  .timeline-item.status-incomplete::before { background: #60a5fa; }
+  .timeline-item-time { font-size: 15px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; }
+  .timeline-item-title { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; line-height: 1.5; }
+  .timeline-item-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: #94a3b8; }
+  .timeline-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .timeline-badge.done { background: #14532d; color: #4ade80; }
+  .timeline-badge.blocked { background: #431407; color: #fb923c; }
+  .timeline-badge.error { background: #450a0a; color: #f87171; }
+  .timeline-badge.incomplete { background: #1e3a5f; color: #60a5fa; }
+  .timeline-badge.default { background: #1e293b; color: #94a3b8; }
+  .timeline-item-extra { font-size: 11px; color: #475569; margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .timeline-task-chip { font-size: 10px; padding: 2px 6px; border-radius: 4px; border: 1px solid #2d3148; color: #cbd5e1; background: #0f1117; }
+  .timeline-empty { color: #475569; text-align: center; padding: 32px 0; }
+  /* 详情弹窗 */
+  .detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .detail-overlay.hidden { display: none; }
+  .detail-modal { background: #1a1d2e; border: 1px solid #7c3aed; border-radius: 14px; padding: 24px; width: 560px; max-width: 95vw; max-height: 80vh; overflow-y: auto; position: relative; }
+  .detail-modal h3 { font-size: 16px; color: #c4b5fd; margin-bottom: 6px; padding-right: 28px; }
+  .detail-meta { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  .detail-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: #64748b; font-size: 18px; cursor: pointer; line-height: 1; }
+  .detail-close:hover { color: #e2e8f0; }
+  .subtask-list { display: flex; flex-direction: column; gap: 8px; }
+  .subtask-item { background: #0f1117; border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .subtask-status { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600; flex-shrink: 0; margin-top: 1px; }
+  .subtask-name { font-size: 13px; color: #e2e8f0; flex: 1; }
+  .subtask-detail { font-size: 12px; color: #64748b; margin-top: 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+  .subtask-summary { font-size: 12px; color: #94a3b8; margin-top: 4px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+  .subtask-time { font-size: 11px; color: #475569; margin-top: 3px; }
+  /* 子任务扩展字段 */
+  .subtask-ext-section { margin-top: 10px; border-top: 1px solid #2d3148; padding-top: 8px; }
+  .subtask-ext-item { margin-bottom: 8px; }
+  .subtask-ext-item:last-child { margin-bottom: 0; }
+  .subtask-ext-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .subtask-ext-content { font-size: 12px; color: #94a3b8; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+  .subtask-ext-divider { border: none; border-top: 1px solid #1e2235; margin: 6px 0; }
+  /* relatedFiles */
+  .subtask-files-list { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+  .subtask-file-item { display: flex; align-items: center; gap: 6px; }
+  .subtask-file-path { font-size: 11px; color: #a78bfa; font-family: monospace; background: #0a0d14; border: 1px solid #2d3148; border-radius: 3px; padding: 2px 7px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subtask-file-copy { font-size: 10px; padding: 2px 6px; border-radius: 3px; border: 1px solid #2d3148; background: #1a1d2e; color: #64748b; cursor: pointer; flex-shrink: 0; transition: all .15s; }
+  .subtask-file-copy:hover { border-color: #7c3aed; color: #c4b5fd; }
+  /* notes 高亮 */
+  .subtask-notes-box { background: #2a1f00; border: 1px solid #d97706; border-radius: 6px; padding: 8px 12px; margin-top: 4px; }
+  .subtask-notes-label { font-size: 11px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .subtask-notes-content { font-size: 12px; color: #fcd34d; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+  /* workLog */
+  .wl-section { margin-top: 10px; border-top: 1px solid #2d3148; padding-top: 8px; }
+  .wl-title { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .wl-item { background: #0a0d14; border: 1px solid #1e2235; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+  .wl-item:last-child { margin-bottom: 0; }
+  .wl-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .wl-action { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: #1e3a5f; color: #60a5fa; text-transform: uppercase; }
+  .wl-time { font-size: 10px; color: #475569; margin-left: auto; }
+  .wl-content { font-size: 12px; color: #94a3b8; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+  .wl-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .wl-file { font-size: 10px; color: #a78bfa; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 3px; padding: 1px 6px; font-family: monospace; }
+  /* 阻塞任务样式 */
+  .blocked-card { background: #1c1208; border: 1px solid #d97706; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+  .blocked-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .blocked-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; background: #92400e; color: #fbbf24; }
+  .blocked-queue-badge { background: #1e3a5f; color: #60a5fa; }
+  .blocked-task-name { font-size: 13px; color: #fbbf24; font-weight: 500; flex: 1; }
+  .blocked-reason { font-size: 12px; color: #d97706; margin-bottom: 6px; }
+  .blocked-question { font-size: 12px; color: #e2e8f0; background: #0f1117; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; line-height: 1.5; }
+  .blocked-waiting { font-size: 12px; color: #60a5fa; background: #0f1117; border-radius: 6px; padding: 6px 10px; }
+  .unblock-area { display: flex; flex-direction: column; gap: 6px; }
+  .unblock-textarea { width: 100%; padding: 7px 10px; background: #1a1d2e; border: 1px solid #d97706; border-radius: 6px; color: #e2e8f0; font-size: 12px; resize: vertical; min-height: 60px; outline: none; font-family: inherit; }
+  .unblock-textarea:focus { border-color: #f59e0b; }
+  .btn-unblock { padding: 6px 14px; border-radius: 6px; border: none; background: #d97706; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; align-self: flex-end; transition: background .2s; }
+  .btn-unblock:hover { background: #b45309; }
+  .btn-unblock:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  /* 解除阻塞弹窗 */
+  .unblock-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 390; display: flex; align-items: center; justify-content: center; }
+  .unblock-modal-overlay.hidden { display: none; }
+  .unblock-modal { background: #1a1d2e; border: 1px solid #d97706; border-radius: 14px; padding: 24px; width: 460px; max-width: 94vw; }
+  .unblock-modal h4 { font-size: 15px; color: #fbbf24; margin-bottom: 6px; }
+  .unblock-modal .unblock-agent { font-size: 12px; color: #92400e; margin-bottom: 14px; }
+  .unblock-modal-textarea { width: 100%; padding: 10px 12px; background: #0f1117; border: 1px solid #d97706; border-radius: 8px; color: #e2e8f0; font-size: 13px; resize: vertical; min-height: 120px; outline: none; font-family: inherit; line-height: 1.6; }
+  .unblock-modal-textarea:focus { border-color: #f59e0b; }
+  .unblock-modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+  .unblock-modal-btns button { padding: 8px 20px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-unblock-cancel { background: #2d3148; color: #94a3b8; }
+  .btn-unblock-confirm { background: #d97706; color: #fff; }
+  .btn-unblock-confirm:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  /* lightbox */
+  .lightbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 1000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+  .lightbox-overlay.hidden { display: none; }
+  .lightbox-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.8); }
+  /* 清理空任务按钮 */
+  .btn-clean-empty { padding: 4px 10px; border-radius: 6px; border: 1px solid #7f1d1d; background: #1c0a0a; color: #f87171; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s; white-space: nowrap; }
+  .btn-clean-empty:hover { background: #450a0a; }
+  /* 清理空任务弹窗 */
+  .clean-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 500; display: flex; align-items: center; justify-content: center; }
+  .clean-overlay.hidden { display: none; }
+  .clean-modal { background: #1a1d2e; border: 1px solid #7f1d1d; border-radius: 14px; padding: 24px; width: 480px; max-width: 94vw; max-height: 80vh; display: flex; flex-direction: column; }
+  .clean-modal h4 { font-size: 15px; color: #f87171; margin-bottom: 12px; }
+  .clean-file-list { flex: 1; overflow-y: auto; background: #0f1117; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; font-size: 12px; color: #94a3b8; line-height: 1.8; }
+  .clean-file-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #1e293b; }
+  .clean-file-item:last-child { border-bottom: none; }
+  .clean-file-agent { color: #a78bfa; font-weight: 600; min-width: 80px; }
+  .clean-file-name { font-family: monospace; color: #60a5fa; }
+  .clean-file-req { color: #64748b; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 180px; }
+  .clean-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .clean-btns button { padding: 8px 20px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-clean-cancel { background: #2d3148; color: #94a3b8; }
+  .btn-clean-confirm { background: #991b1b; color: #fff; }
+  /* 服务详情弹窗 */
+  .svc-detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 600; display: flex; align-items: center; justify-content: center; }
+  .svc-detail-overlay.hidden { display: none; }
+  .svc-detail-modal { background: #1a1d2e; border: 1px solid #7c3aed; border-radius: 14px; padding: 28px 28px 22px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; position: relative; }
+  .svc-detail-title { font-size: 20px; font-weight: 700; color: #c4b5fd; margin-bottom: 18px; padding-right: 32px; }
+  .svc-detail-close { position: absolute; top: 18px; right: 18px; background: none; border: none; color: #64748b; font-size: 20px; cursor: pointer; line-height: 1; }
+  .svc-detail-close:hover { color: #e2e8f0; }
+  .svc-detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 10px 14px; align-items: start; }
+  .svc-detail-label { font-size: 12px; color: #64748b; padding-top: 2px; }
+  .svc-detail-value { font-size: 13px; color: #e2e8f0; word-break: break-all; }
+  .svc-detail-copy { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .svc-detail-copy:hover .svc-detail-copy-text { color: #a78bfa; }
+  .svc-detail-copy-btn { font-size: 11px; padding: 1px 7px; border-radius: 4px; border: 1px solid #2d3148; background: #0f1117; color: #64748b; cursor: pointer; flex-shrink: 0; }
+  .svc-detail-copy-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+  .svc-detail-divider { grid-column: 1 / -1; border: none; border-top: 1px solid #2d3148; margin: 4px 0; }
+  /* session 分组 */
+  .session-group { margin-bottom: 12px; }
+  .session-group-header { font-size: 11px; color: #64748b; padding: 4px 0; margin-bottom: 6px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; gap: 6px; }
+  .session-group-id { font-family: monospace; color: #a78bfa; }
+  .session-group-blocked { color: #f59e0b; font-weight: 600; }
+
+  /* 任务组卡片 */
+  .sg-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 20px; transition: border-color .2s, transform .2s; }
+  .sg-card:hover { border-color: #7c3aed; transform: translateY(-2px); }
+  .sg-card.status-done { border-color: #16a34a; }
+  .sg-card.status-blocked { border-color: #d97706; }
+  .sg-card.status-active { border-color: #3b82f6; }
+  .sg-card.status-disconnected { border-color: #dc2626; }
+  .sg-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .sg-title { font-size: 15px; font-weight: 600; color: #c4b5fd; flex: 1; min-width: 0; word-break: break-all; }
+  .sg-req { font-size: 12px; color: #94a3b8; margin-bottom: 12px; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .sg-footer { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .sg-footer .btn { flex: 1; min-width: 60px; padding: 7px 8px; font-size: 12px; }
+  .btn-sg-archive { background: #1e293b; color: #f59e0b; border: 1px solid #92400e; }
+  .btn-sg-detail { background: #2d3148; color: #c4b5fd; }
+  /* 详情展开区 */
+  .sg-detail { display: none; margin-top: 12px; border-top: 1px solid #2d3148; padding-top: 12px; }
+  .sg-detail.open { display: block; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1d2e; }
+::-webkit-scrollbar-thumb { background: #4a4f6a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6b72a0; }
+
+  /* ── 部门过滤 ── */
+  .dept-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; margin-bottom: 16px; }
+  .dept-filter-label { font-size: 12px; color: #64748b; white-space: nowrap; }
+  .dept-filter-items { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+  .tg-toolbar { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tg-batch-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; background: #1a1d2e; border: 1px solid #7c3aed; border-radius: 10px; margin-bottom: 16px; }
+  .tg-batch-master { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #334155; border-radius: 8px; background: #111428; color: #cbd5e1; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; }
+  .tg-batch-master input { width: 15px; height: 15px; accent-color: #7c3aed; cursor: pointer; }
+  .tg-batch-master-text { white-space: nowrap; }
+  .tg-batch-info { font-size: 13px; color: #c4b5fd; flex: 1; }
+  .btn-batch { padding: 8px 16px; border-radius: 8px; border: 1px solid #7c3aed; background: #1e2235; color: #c4b5fd; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-batch:hover { background: #2b3150; }
+  .btn-batch:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-batch-primary { background: #7c3aed; color: #fff; }
+  .btn-batch-primary:hover:not(:disabled) { background: #6d28d9; }
+  .sg-card.select-mode { position: relative; padding-top: 62px; }
+  @media (max-width: 760px) {
+    .tg-toolbar { justify-content: flex-start; }
+  }
+  .sg-select-wrap { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: center; width: 100%; height: 36px; border-radius: 12px 12px 0 0; background: #1e293b; border-bottom: 1px solid #334155; cursor: pointer; transition: background .2s, color .2s, border-color .2s; overflow: hidden; }
+  .sg-select-wrap:hover { background: #273449; }
+  .sg-select-wrap input[type=checkbox] { position: absolute; opacity: 0; pointer-events: none; }
+  .sg-select-text { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #cbd5e1; }
+  .sg-select-wrap.is-selected { background: linear-gradient(90deg, #2563eb, #3b82f6); border-bottom-color: rgba(191,219,254,.35); }
+  .sg-select-wrap.is-selected .sg-select-text { color: #eff6ff; }
+  .sg-card.selected { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(59,130,246,.35), 0 12px 24px rgba(37,99,235,.12); }
+  .dept-checkbox-item { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .dept-checkbox-item input[type=checkbox] { accent-color: #7c3aed; width: 14px; height: 14px; cursor: pointer; }
+  .dept-checkbox-item span { font-size: 13px; color: #c4b5fd; }
+  .dept-filter-all { font-size: 12px; color: #7c3aed; cursor: pointer; text-decoration: underline; white-space: nowrap; }
+  .dept-filter-all:hover { color: #a78bfa; }
+
+  /* ── Todo 样式 ── */
+  .todo-section { margin-top: 32px; }
+  .todo-section-title { font-size: 18px; font-weight: 700; color: #a78bfa; margin-bottom: 16px; letter-spacing: 1px; }
+  .todo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .todo-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 16px; }
+  .todo-card.status-pending { border-left: 3px solid #f59e0b; }
+  .todo-card.status-planned { border-left: 3px solid #3b82f6; }
+  .todo-card.status-assigned { border-left: 3px solid #22c55e; }
+  .todo-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .todo-status-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+  .todo-status-pending { background: #451a03; color: #f59e0b; }
+  .todo-status-planned { background: #1e3a5f; color: #60a5fa; }
+  .todo-status-assigned { background: #14532d; color: #4ade80; }
+  .todo-desc { font-size: 13px; color: #cbd5e1; margin-bottom: 10px; line-height: 1.5; }
+  .todo-meta { font-size: 11px; color: #475569; margin-bottom: 12px; }
+  .todo-linked { font-size: 11px; color: #7c3aed; margin-bottom: 12px; }
+  .todo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-todo { padding: 6px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity .2s; }
+  .btn-todo:hover { opacity: .8; }
+  .btn-todo:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-plan { background: #3b82f6; color: #fff; }
+  .btn-assign { background: #22c55e; color: #fff; }
+  .btn-view-task { background: #2d3148; color: #c4b5fd; }
+  /* ── 测试面板 ── */
+  .test-panel { background: #1a1d2e; border: 1px solid #7c3aed; border-radius: 12px; padding: 24px; margin-top: 32px; }
+  .test-panel-title { font-size: 16px; font-weight: 700; color: #a78bfa; margin-bottom: 20px; }
+  .test-step { background: #0f1117; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .test-step-title { font-size: 13px; font-weight: 600; color: #60a5fa; margin-bottom: 12px; }
+  .test-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; }
+  .test-input { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 6px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; flex: 1; min-width: 200px; }
+  .test-input:focus { outline: none; border-color: #7c3aed; }
+  .test-btn { padding: 8px 16px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; background: #7c3aed; color: #fff; white-space: nowrap; }
+  .test-btn:hover { background: #6d28d9; }
+  .test-btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  .test-output { background: #0a0d14; border: 1px solid #1e293b; border-radius: 6px; padding: 12px; font-size: 12px; color: #94a3b8; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; margin-top: 8px; display: none; }
+  .test-output.show { display: block; }
+  .test-output.ok { border-color: #14532d; color: #4ade80; }
+  .test-output.err { border-color: #7f1d1d; color: #f87171; }
+  /* ── 指派弹窗 ── */
+  .assign-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: flex; align-items: center; justify-content: center; }
+  .assign-overlay.hidden { display: none; }
+  .assign-modal { background: #1a1d2e; border: 1px solid #7c3aed; border-radius: 12px; padding: 24px; min-width: 360px; }
+  .assign-modal h3 { color: #a78bfa; margin-bottom: 16px; }
+  .assign-modal select { width: 100%; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; padding: 8px; color: #e2e8f0; font-size: 13px; margin-bottom: 12px; }
+  .assign-modal input { width: 100%; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; padding: 8px; color: #e2e8f0; font-size: 13px; margin-bottom: 16px; }
+  .assign-modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel { padding: 8px 16px; border-radius: 6px; border: none; background: #2d3148; color: #94a3b8; cursor: pointer; }
+  .btn-confirm { padding: 8px 16px; border-radius: 6px; border: none; background: #7c3aed; color: #fff; cursor: pointer; font-weight: 600; }
+
+  /* ===== 测试看板 ===== */
+  .testing-toolbar { display: flex; gap: 10px; align-items: center; padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+  .btn-primary { padding: 8px 16px; border-radius: 6px; border: none; background: #7c3aed; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .btn-primary:hover { background: #6d28d9; }
+  .test-session-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; margin: 0 24px 16px; max-width: 1152px; margin-left: auto; margin-right: auto; overflow: hidden; }
+  .test-session-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; }
+  .test-session-header:hover { background: #1e2235; }
+  .test-session-title { font-weight: 600; color: #e2e8f0; flex: 1; }
+  .test-session-meta { font-size: 12px; color: #64748b; }
+  .test-progress-bar { height: 6px; background: #2d3148; border-radius: 3px; overflow: hidden; width: 120px; }
+  .test-progress-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #06b6d4); border-radius: 3px; transition: width 0.3s; }
+  .test-session-body { border-top: 1px solid #2d3148; padding: 16px 18px; display: none; }
+  .test-session-body.open { display: block; }
+  .test-section-label { font-size: 12px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; margin-top: 4px; }
+  .test-case-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; background: #0f1117; }
+  .test-case-name { flex: 1; font-size: 13px; color: #cbd5e1; }
+  .test-case-desc { font-size: 11px; color: #475569; margin-top: 2px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-pending { background: #1e293b; color: #64748b; }
+  .badge-pass { background: #052e16; color: #4ade80; }
+  .badge-fail { background: #2d0a0a; color: #f87171; }
+  .badge-blocked { background: #2d1a00; color: #fb923c; }
+  .test-case-actions { display: flex; gap: 4px; }
+  .btn-status { padding: 3px 8px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; font-weight: 600; }
+  .btn-pass { background: #052e16; color: #4ade80; } .btn-pass:hover { background: #14532d; }
+  .btn-fail { background: #2d0a0a; color: #f87171; } .btn-fail:hover { background: #450a0a; }
+  .btn-blocked { background: #2d1a00; color: #fb923c; } .btn-blocked:hover { background: #431407; }
+  .issue-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; background: #0f1117; }
+  .issue-title { flex: 1; font-size: 13px; color: #cbd5e1; }
+  .issue-assign { font-size: 11px; color: #7c3aed; background: #1e1b4b; padding: 2px 6px; border-radius: 4px; }
+  .badge-open { background: #1e293b; color: #38bdf8; }
+  .badge-resolved { background: #052e16; color: #4ade80; }
+  .btn-resolve { padding: 3px 8px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; background: #052e16; color: #4ade80; }
+  .btn-resolve:hover { background: #14532d; }
+  .test-add-issue-btn { margin-top: 8px; padding: 6px 12px; border-radius: 6px; border: 1px dashed #2d3148; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; width: 100%; }
+  .test-add-issue-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+  .test-stats { display: flex; gap: 12px; align-items: center; }
+  .stat-chip { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .stat-pass { background: #052e16; color: #4ade80; }
+  .stat-fail { background: #2d0a0a; color: #f87171; }
+  .stat-blocked { background: #2d1a00; color: #fb923c; }
+  .stat-pending { background: #1e293b; color: #64748b; }
+  /* 创建测试会话弹窗 */
+  .test-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .test-modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; width: 480px; max-width: 95vw; max-height: 80vh; overflow-y: auto; }
+  .test-modal h3 { margin: 0 0 16px; color: #e2e8f0; font-size: 16px; }
+  .test-modal label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; margin-top: 12px; }
+  .test-input { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #2d3148; background: #0f1117; color: #e2e8f0; font-size: 13px; box-sizing: border-box; }
+  .test-input:focus { outline: none; border-color: #7c3aed; }
+  .test-modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .test-case-input-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .test-case-input-row input { flex: 1; }
+  .btn-remove-case { padding: 6px 10px; border-radius: 4px; border: none; background: #2d0a0a; color: #f87171; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left"></div>
+  <div class="header-center">
+    <h1>琅琊阁 · 将士看板</h1>
+    <div class="subtitle">知天下事，晓将士情</div>
+  </div>
+  <div class="refresh-info">
+    <button class="refresh-toggle" id="refresh-toggle" onclick="toggleDashboardRefresh()" title="绿色表示自动刷新运行中；点击后暂停。红色时再次点击会立即刷新并恢复自动刷新。">
+      <span class="dot"></span>
+      <span class="refresh-toggle-label" id="refresh-toggle-label">自动刷新</span>
+    </button>
+    <span class="countdown" id="countdown">
+      <span class="countdown-icon">⏱</span>
+      <span class="countdown-text"><span class="countdown-value">10</span><span class="countdown-unit">s</span></span>
+    </span>
+  </div>
+</header>
+<div class="tabs">
+  <button class="tab-btn active" id="tab-groups" onclick="switchTab('groups')">任务组</button>
+  <button class="tab-btn" id="tab-history" onclick="switchTab('history')">历史任务</button>
+  <button class="tab-btn" id="tab-services" onclick="switchTab('services')">服务</button>
+</div>
+<main>
+  <div id="pane-groups">
+    <!-- 部门过滤 -->
+    <div class="dept-filter" id="dept-filter">
+      <span class="dept-filter-label">部门过滤：</span>
+      <div class="dept-filter-items" id="dept-filter-items"></div>
+      <span class="dept-filter-all" onclick="deptSelectAll()">全选</span>
+      <span class="dept-filter-all" onclick="deptSelectNone()">清空</span>
+    </div>
+    <div class="tg-toolbar" id="tg-toolbar">
+      <button class="btn-clean-empty" onclick="promptCleanEmpty()" title="删除只有描述但没有任何 tasks 的任务文件">🗑 清理空任务</button>
+      <button class="btn-batch" id="btn-enter-batch" onclick="enterBatchArchiveMode()">批量归档</button>
+    </div>
+    <div class="tg-batch-bar" id="tg-batch-bar" style="display:none">
+      <label class="tg-batch-master" for="tg-batch-master-checkbox" title="全选或全取消当前页面可归档的任务组">
+        <input type="checkbox" id="tg-batch-master-checkbox" onchange="toggleBatchSelectAll(this.checked)">
+        <span class="tg-batch-master-text" id="tg-batch-master-text">全选</span>
+      </label>
+      <div class="tg-batch-info" id="tg-batch-info">已进入批量归档模式</div>
+      <button class="btn-batch" onclick="cancelBatchArchiveMode()">取消</button>
+      <button class="btn-batch btn-batch-primary" id="btn-batch-confirm" onclick="promptBatchArchive()" disabled>确认归档</button>
+    </div>
+    <div class="grid" id="sg-grid"><div class="empty">加载中…</div></div>
+  </div>
+  <div id="pane-history" style="display:none">
+    <div class="dept-filter" id="history-dept-filter">
+      <span class="dept-filter-label">部门过滤：</span>
+      <div class="dept-filter-items" id="history-dept-filter-items"></div>
+      <span class="dept-filter-all" onclick="historyDeptSelectAll()">全选</span>
+      <span class="dept-filter-all" onclick="historyDeptSelectNone()">清空</span>
+    </div>
+    <div class="history-search">
+      <input type="text" id="history-search-input" placeholder="搜索历史任务..." oninput="filterHistory(this.value)" />
+    </div>
+    <div class="history-view-toggle">
+      <button class="history-view-btn active" id="history-view-list" onclick="setHistoryView('list')">卡片视图</button>
+      <button class="history-view-btn" id="history-view-timeline" onclick="setHistoryView('timeline')">时间轴视图</button>
+    </div>
+    <div class="history-groups" id="history-groups"><div class="empty">加载中…</div></div>
+    <div class="history-timeline" id="history-timeline"><div class="timeline-empty">加载中…</div></div>
+  </div>
+
+  <div id="pane-services" style="display:none">
+    <div class="service-panel">
+      <div class="service-header">
+        <div>
+          <div class="service-title">服务管理</div>
+          <div class="service-desc">展示所有已注册服务，10 秒自动检查端口状态，可手动强杀指定端口。</div>
+        </div>
+        <div class="service-refresh">
+          <button class="btn" style="padding:6px 12px;background:#2d3148;color:#c4b5fd" onclick="refreshServicesNow()">立即刷新</button>
+        </div>
+      </div>
+      <div class="service-table-wrap">
+        <table class="services-table">
+          <thead>
+            <tr>
+              <th>服务</th>
+              <th>端口</th>
+              <th>类型</th>
+              <th>Docker 映射</th>
+              <th>状态</th>
+              <th>启动时间</th>
+              <th>PID</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="services-body">
+            <tr><td colspan="9" class="service-empty">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="service-note">提示：所有本地启动的服务必须通过 service_manager.py 注册；停服后此处仍会保留记录。</div>
+    </div>
+  </div>
+
+
+  </main>
+<div class="detail-overlay hidden" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-modal" id="detail-modal">
+    <button class="detail-close" onclick="closeTaskModal()">✕</button>
+    <h3 id="detail-title"></h3>
+    <div class="detail-meta" id="detail-meta"></div>
+    <div class="detail-req" id="detail-req" style="display:none;background:#1e2235;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#94a3b8;line-height:1.6;white-space:pre-wrap;word-break:break-all;"></div>
+    <div class="subtask-list" id="detail-subtasks"></div>
+  </div>
+</div>
+<div class="confirm-overlay hidden" id="confirm-overlay">
+  <div class="confirm-modal">
+    <p id="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button class="btn-cancel" onclick="closeConfirm()">取消</button>
+      <button class="btn-confirm" id="confirm-ok-btn" onclick="confirmArchive()">确认</button>
+    </div>
+  </div>
+</div>
+<div class="lightbox-overlay hidden" id="lightbox-overlay" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="预览" />
+</div>
+<div class="svc-detail-overlay hidden" id="svc-detail-overlay" onclick="closeSvcDetail(event)">
+  <div class="svc-detail-modal" id="svc-detail-modal">
+    <button class="svc-detail-close" onclick="document.getElementById('svc-detail-overlay').classList.add('hidden')">✕</button>
+    <div class="svc-detail-title" id="svc-detail-name"></div>
+    <div class="svc-detail-grid" id="svc-detail-grid"></div>
+  </div>
+</div>
+<div class="clean-overlay hidden" id="clean-overlay">
+  <div class="clean-modal">
+    <h4>🗑 清理空任务文件</h4>
+    <div class="clean-file-list" id="clean-file-list"><div style="color:#475569">扫描中…</div></div>
+    <div class="clean-btns">
+      <button class="btn-clean-cancel" onclick="closeCleanModal()">取消</button>
+      <button class="btn-clean-confirm" id="clean-confirm-btn" onclick="confirmCleanEmpty()" disabled>确认删除</button>
+    </div>
+  </div>
+</div>
+<div class="unblock-modal-overlay hidden" id="unblock-modal-overlay">
+  <div class="unblock-modal">
+    <h4>解除阻塞 - 请输入解决方案</h4>
+    <div class="unblock-agent" id="unblock-agent-label"></div>
+    <textarea class="unblock-modal-textarea" id="unblock-solution" placeholder="请描述解决方案（必填）"></textarea>
+    <div class="unblock-modal-btns">
+      <button class="btn-unblock-cancel" onclick="closeUnblockModal()">取消</button>
+      <button class="btn-unblock-confirm" id="unblock-confirm-btn" onclick="confirmUnblockSolution()">确认</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+var _unblockPending = null;
+
+function promptUnblockModal(agentId, taskId, sid, taskName) {
+  _unblockPending = {
+    agentId: agentId,
+    taskId: taskId,
+    sid: sid || '',
+    taskName: taskName || '未命名任务'
+  };
+  document.getElementById('unblock-agent-label').textContent = '代理：' + getAgentLabel(agentId) + ' · 任务组 ' + (sid || '-') + ' · 任务 ' + (taskName || '未命名任务');
+  document.getElementById('unblock-solution').value = '';
+  document.getElementById('unblock-confirm-btn').disabled = false;
+  document.getElementById('unblock-confirm-btn').textContent = '确认';
+  document.getElementById('unblock-modal-overlay').classList.remove('hidden');
+}
+
+function closeUnblockModal() {
+  _unblockPending = null;
+  document.getElementById('unblock-modal-overlay').classList.add('hidden');
+}
+
+function confirmUnblockSolution() {
+  if (!_unblockPending) return;
+  var solution = document.getElementById('unblock-solution').value.trim();
+  if (!solution) { showToast('请输入解决方案后再提交', 'err'); return; }
+  var btn = document.getElementById('unblock-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '提交中…';
+  fetch('/api/unblock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agentId: _unblockPending.agentId,
+      taskId: _unblockPending.taskId,
+      sessionId: _unblockPending.sid,
+      answer: solution
+    })
+  }).then(function(r){ return r.json(); }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || '解除阻塞失败');
+    closeUnblockModal();
+    showToast('✅ 任务已解除阻塞', 'ok');
+    setTimeout(loadTaskGroups, 1000);
+  }).catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = '确认';
+    showToast('❌ 解除阻塞失败: ' + e.message, 'err');
+  });
+}
+
+function openLightbox(dataUrl) {
+  document.getElementById('lightbox-img').src = dataUrl;
+  document.getElementById('lightbox-overlay').classList.remove('hidden');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox-overlay').classList.add('hidden');
+  document.getElementById('lightbox-img').src = '';
+}
+
+
+var AGENT_LABELS = {};
+var AGENTS_CONFIG = [];
+
+function normalizeAgentConfig(item) {
+  if (!item) return null;
+  var agentId = item.agentId || item.agent || item.id || item.code || '';
+  var code = item.code || agentId;
+  var name = item.name || item.label || AGENT_LABELS[agentId] || agentId;
+  if (!agentId) return null;
+  AGENT_LABELS[agentId] = name;
+  return {
+    code: code,
+    id: code,
+    name: name,
+    label: name,
+    agentId: agentId,
+    agent: agentId,
+    workspace: item.workSpace || item.workspace || ''
+  };
+}
+
+function getAgentLabel(agentId) {
+  return AGENT_LABELS[agentId] || agentId;
+}
+
+function getConfiguredAgents() {
+  return Array.isArray(AGENTS_CONFIG) ? AGENTS_CONFIG.slice() : [];
+}
+
+function getConfiguredAgentsForFilters() {
+  return getConfiguredAgents().filter(function(item) {
+    return item.agentId !== 'taizi';
+  });
+}
+
+function setAgentConfigs(configs) {
+  AGENTS_CONFIG = (configs || []).map(normalizeAgentConfig).filter(Boolean);
+}
+
+var currentTab = 'groups';
+var currentServiceCountdown = 10;
+var serviceTimer = null;
+// Cache for agent data (tasks, sessions from tasks.json)
+var agentDataCache = {};
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-groups').className = 'tab-btn' + (tab === 'groups' ? ' active' : '');
+  document.getElementById('tab-history').className = 'tab-btn' + (tab === 'history' ? ' active' : '');
+  document.getElementById('tab-services').className = 'tab-btn' + (tab === 'services' ? ' active' : '');
+  document.getElementById('pane-groups').style.display = tab === 'groups' ? '' : 'none';
+  document.getElementById('pane-history').style.display = tab === 'history' ? '' : 'none';
+  document.getElementById('pane-services').style.display = tab === 'services' ? '' : 'none';
+  if (tab === 'history') loadHistory();
+  if (tab === 'groups') loadTaskGroups();
+  if (tab === 'services') initServicesTab();
+  resetDashboardRefreshTimer();
+}
+
+// 每 10 秒自动刷新任务组（仅当前在任务组 Tab 时）
+var _serviceRefreshTimer = null;
+function startServiceAutoRefresh() {
+  if (_serviceRefreshTimer) clearInterval(_serviceRefreshTimer);
+  currentServiceCountdown = 10;
+  updateServiceCountdownDisplay();
+  _serviceRefreshTimer = setInterval(function() {
+    if (currentTab === 'services') {
+      currentServiceCountdown--;
+      if (currentServiceCountdown <= 0) {
+        loadServicesStatus();
+        currentServiceCountdown = 10;
+      }
+      updateServiceCountdownDisplay();
+    }
+  }, 1000);
+}
+startServiceAutoRefresh();
+
+function parseTimestamp(ts) {
+  if (!ts && ts !== 0) return null;
+  if (ts instanceof Date) {
+    return isNaN(ts.getTime()) ? null : ts;
+  }
+  if (typeof ts === 'number') {
+    const dNum = new Date(ts);
+    return isNaN(dNum.getTime()) ? null : dNum;
+  }
+  var str = String(ts).trim();
+  if (!str) return null;
+  var direct = new Date(str);
+  if (!isNaN(direct.getTime())) return direct;
+  var match = str.match(/^(\d{4})(\d{2})(\d{2})(?:[_-]?(\d{2})(\d{2})(\d{2}))?/);
+  if (match) {
+    var year = parseInt(match[1], 10);
+    var month = parseInt(match[2], 10) - 1;
+    var day = parseInt(match[3], 10);
+    var hour = match[4] ? parseInt(match[4], 10) : 0;
+    var min = match[5] ? parseInt(match[5], 10) : 0;
+    var sec = match[6] ? parseInt(match[6], 10) : 0;
+    var custom = new Date(Date.UTC(year, month, day, hour, min, sec));
+    return isNaN(custom.getTime()) ? null : custom;
+  }
+  return null;
+}
+
+function formatTime(ts) {
+  if (!ts && ts !== 0) return '';
+  const d = parseTimestamp(ts);
+  if (!d) return ts || '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+var historyData = [];
+var HISTORY_PAGE_SIZE = 15;
+var HISTORY_FETCH_LIMIT = 20;
+var historyPageState = {}; // { agentId: currentPage (1-based) }
+var historyViewMode = 'list';
+var historyHasMoreByAgent = {};
+var historyBeforeByAgent = {};
+var historyRequestToken = 0;
+
+function historyGetPage(agentId) {
+  return historyPageState[agentId] || 1;
+}
+
+function historySetPage(agentId, page) {
+  historyPageState[agentId] = page;
+}
+
+function historyResetPages() {
+  historyPageState = {};
+}
+
+function getHistorySelectedAgentsForRequest() {
+  var selected = historyDeptGetSelected();
+  if (selected && selected.length) return selected;
+  var deptAgents = getDeptAgents();
+  return deptAgents.map(function(a){ return a.id; });
+}
+
+function mergeHistoryEntries(existing, incoming) {
+  var map = {};
+  (existing || []).forEach(function(item) {
+    if (!item) return;
+    var key = [item.agent || '', item.fileName || '', item.sid || '', item.source || ''].join('::');
+    map[key] = item;
+  });
+  (incoming || []).forEach(function(item) {
+    if (!item) return;
+    var key = [item.agent || '', item.fileName || '', item.sid || '', item.source || ''].join('::');
+    map[key] = item;
+  });
+  return Object.keys(map).map(function(key) { return map[key]; }).sort(function(a, b) {
+    return getTimeValue(b.completedAt || b.createdAt) - getTimeValue(a.completedAt || a.createdAt);
+  });
+}
+
+function rebuildHistoryPaginationState(list, selectedAgents, limit) {
+  var grouped = {};
+  (selectedAgents || []).forEach(function(agentId) { grouped[agentId] = []; });
+  (list || []).forEach(function(item) {
+    if (!item || !item.agent) return;
+    grouped[item.agent] = grouped[item.agent] || [];
+    grouped[item.agent].push(item);
+  });
+  historyHasMoreByAgent = {};
+  historyBeforeByAgent = {};
+  Object.keys(grouped).forEach(function(agentId) {
+    var items = grouped[agentId] || [];
+    items.sort(function(a, b) {
+      return getTimeValue(b.completedAt || b.createdAt) - getTimeValue(a.completedAt || a.createdAt);
+    });
+    historyHasMoreByAgent[agentId] = items.length >= limit;
+    if (items.length > 0) {
+      var last = items[items.length - 1];
+      historyBeforeByAgent[agentId] = last.sid || last.completedAt || last.createdAt || '';
+    } else {
+      historyBeforeByAgent[agentId] = '';
+    }
+  });
+}
+
+function renderHistoryLoading(message) {
+  var text = message || '加载中…';
+  document.getElementById('history-groups').innerHTML = '<div class="empty">' + esc(text) + '</div>';
+  document.getElementById('history-timeline').innerHTML = '<div class="timeline-empty">' + esc(text) + '</div>';
+}
+
+function loadHistory(options) {
+  options = options || {};
+  var append = !!options.append;
+  var selectedAgents = options.agents || getHistorySelectedAgentsForRequest();
+  var limit = options.limit || HISTORY_FETCH_LIMIT;
+  if (!append) renderHistoryLoading('加载中…');
+
+  var before = '';
+  if (append) {
+    var beforeCandidates = selectedAgents.map(function(agentId) { return historyBeforeByAgent[agentId] || ''; }).filter(Boolean);
+    before = beforeCandidates.length ? beforeCandidates.sort()[0] : '';
+  }
+
+  var params = new URLSearchParams();
+  if (selectedAgents.length) params.set('agents', selectedAgents.join(','));
+  params.set('limit', String(limit));
+  if (before) params.set('before', before);
+
+  var requestToken = ++historyRequestToken;
+  fetch('/api/history?' + params.toString()).then(function(r){ return r.json(); }).then(function(data) {
+    if (requestToken !== historyRequestToken) return;
+    if (!data.ok) throw new Error(data.error || '请求失败');
+    _lastHistoryDeptSelected = selectedAgents.slice().sort().join(',');
+    var incoming = (data.history || []).filter(function(item) {
+      return item && item.taskCount !== 0 && item.userRequirement !== '__DASHBOARD_TIMELINE_DEBUG__';
+    });
+    historyData = append ? mergeHistoryEntries(historyData, incoming) : incoming;
+    historyDeptInitCheckboxes();
+    rebuildHistoryPaginationState(historyData, selectedAgents, limit);
+    historyApplyFilters();
+  }).catch(function(e) {
+    if (requestToken !== historyRequestToken) return;
+    document.getElementById('history-groups').innerHTML = '<div class="empty">加载失败: '+esc(e.message)+'</div>';
+    document.getElementById('history-timeline').innerHTML = '<div class="timeline-empty">加载失败: '+esc(e.message)+'</div>';
+  });
+}
+
+// 计算任务整体状态：有 error → error，有 timeout → timeout，全 completed → done，有未完成 → incomplete，有 blocked → blocked
+function calcHistoryStatus(tasks) {
+  if (!tasks || tasks.length === 0) return 'done';
+  var statuses = tasks.map(function(t) { return (t.status || '').toLowerCase(); });
+  if (statuses.some(function(s) { return s === 'error' || s === 'failed'; })) return 'error';
+  if (statuses.some(function(s) { return s === 'timeout'; })) return 'timeout';
+  if (statuses.every(function(s) { return s === 'completed' || s === 'done'; })) return 'done';
+  if (statuses.some(function(s) { return s === 'blocked'; })) return 'blocked';
+  if (statuses.some(function(s) { return s === 'in_progress' || s === 'pending'; })) return 'incomplete';
+  return 'done';
+}
+
+// 计算运行时长：从最早 createdAt 到最晚 completedAt
+function calcDuration(tasks) {
+  if (!tasks || tasks.length === 0) return null;
+  var starts = [], ends = [];
+  tasks.forEach(function(t) {
+    if (t.createdAt) starts.push(t.createdAt);
+    if (t.completedAt) ends.push(t.completedAt);
+    if (t.startedAt) starts.push(t.startedAt);
+  });
+  if (starts.length === 0 || ends.length === 0) return null;
+  // timestamps may be ms or "20260401_151057" strings
+  function toMs(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && v.length >= 15) {
+      // "20260401_151057"
+      var d = v.replace('_','');
+      return new Date(
+        d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8)+'T'+
+        d.slice(8,10)+':'+d.slice(10,12)+':'+d.slice(12,14)
+      ).getTime();
+    }
+    return NaN;
+  }
+  var minStart = Math.min.apply(null, starts.map(toMs).filter(function(n){ return !isNaN(n); }));
+  var maxEnd   = Math.max.apply(null, ends.map(toMs).filter(function(n){ return !isNaN(n); }));
+  if (isNaN(minStart) || isNaN(maxEnd) || maxEnd <= minStart) return null;
+  var sec = Math.round((maxEnd - minStart) / 1000);
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm' + (sec%60) + 's';
+  return Math.floor(sec/3600) + 'h' + Math.floor((sec%3600)/60) + 'm';
+}
+
+// 计算 token 消耗
+function calcTokens(tasks) {
+  if (!tasks || tasks.length === 0) return null;
+  var total = 0;
+  tasks.forEach(function(t) {
+    if (t.tokens) total += (typeof t.tokens === 'number' ? t.tokens : 0);
+    if (t.tokenUsage) total += (typeof t.tokenUsage === 'number' ? t.tokenUsage : 0);
+  });
+  return total > 0 ? total : null;
+}
+
+function renderHistoryCard(h, globalIdx) {
+  var req = h.userRequirement || '（无描述）';
+  var preview = req.length > 60 ? req.substring(0, 60) + '…' : req;
+  var status = calcHistoryStatus(h.tasks);
+  var badgeCls = status === 'done' ? 'h-badge-done'
+    : status === 'timeout' ? 'h-badge-timeout'
+    : status === 'error' ? 'h-badge-error'
+    : status === 'blocked' ? 'h-badge-blocked'
+    : status === 'incomplete' ? 'h-badge-incomplete'
+    : 'h-badge-default';
+  var badgeText = status === 'done' ? '已完成'
+    : status === 'timeout' ? 'timeout'
+    : status === 'error' ? 'error'
+    : status === 'blocked' ? '已阻塞'
+    : status === 'incomplete' ? '未完成'
+    : status;
+  var duration = calcDuration(h.tasks);
+  var tokens = calcTokens(h.tasks);
+  var timeStr = formatTime(h.completedAt);
+
+  // 任务数量统计
+  var tasks = h.tasks || [];
+  var doneCount = tasks.filter(function(t){ return t.status === 'completed'; }).length;
+  var taskCountHtml = '<span class="h-meta-item">📋 ' + doneCount + '/' + tasks.length + ' 完成</span>';
+
+  var metaHtml = '<span class="h-badge ' + badgeCls + '">' + esc(badgeText) + '</span>';
+  metaHtml += '<span class="h-meta-sep">·</span>' + taskCountHtml;
+  if (duration) metaHtml += '<span class="h-meta-sep">·</span><span class="h-meta-item">⏱ ' + esc(duration) + '</span>';
+  metaHtml += '<span class="h-meta-sep">·</span><span class="h-meta-item">🕐 ' + esc(timeStr) + '</span>';
+  if (tokens) metaHtml += '<span class="h-meta-sep">·</span><span class="h-meta-item">🪙 ' + tokens.toLocaleString() + '</span>';
+
+  // 任务详情面板（初始隐藏）
+  var detailHtml = '<div class="history-task-detail" id="hdetail-' + globalIdx + '">';
+  tasks.forEach(function(t) {
+    var st = (t.status || 'pending').toLowerCase();
+    var stCls = 'ts-' + (st === 'done' ? 'completed' : st);
+    var stText = st === 'completed' ? '已完成' : st === 'in_progress' ? '进行中' : st === 'pending' ? '待执行' : st === 'blocked' ? '已阻塞' : st === 'cancelled' ? '已取消' : st;
+    detailHtml += '<div class="history-task-item status-' + esc(st) + '">';
+    detailHtml += '<span class="history-task-status ' + stCls + '">' + esc(stText) + '</span>';
+    detailHtml += '<div class="history-task-name">' + esc(t.name || t.id || '未命名') + '</div>';
+    if (t.description) detailHtml += '<div class="history-task-desc">' + esc(t.description) + '</div>';
+    if (t.completionSummary || t.summary) detailHtml += '<div class="history-task-summary">✓ ' + esc(t.completionSummary || t.summary) + '</div>';
+    detailHtml += '</div>';
+  });
+  detailHtml += '</div>';
+
+  return '<div class="history-card" onclick="toggleHistoryCard(this, ' + globalIdx + ')">' +
+    '<div class="history-card-desc" id="hcard-desc-' + globalIdx + '">' + esc(preview) + '</div>' +
+    '<div class="history-card-meta">' + metaHtml + '</div>' +
+    detailHtml +
+  '</div>';
+}
+
+function toggleHistoryCard(el, idx) {
+  var h = historyData[idx];
+  if (!h) return;
+  openTaskModal({
+    type: 'history',
+    title: h.userRequirement || '（无描述）',
+    meta: getAgentLabel(h.agent) + ' · 完成时间：' + formatTime(h.completedAt),
+    tasks: h.tasks || []
+  });
+}
+
+function renderHistory(list) {
+  var container = document.getElementById('history-groups');
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty">暂无历史任务</div>';
+    document.getElementById('history-timeline').innerHTML = '<div class="timeline-empty">暂无历史任务</div>';
+    return;
+  }
+  // 按 agent 分组，保持 AGENT_LABELS 顺序
+  var agentOrder = ['changlinjun', 'chiyanjun', 'langyage'];
+  var groups = {};
+  agentOrder.forEach(function(a) { groups[a] = []; });
+  list.forEach(function(h) {
+    if (groups[h.agent]) groups[h.agent].push(h);
+    else { groups[h.agent] = [h]; }
+  });
+
+  // 建立全局索引映射（基于原始 historyData，保证 idx 稳定）
+  var globalIndexMap = {};
+  historyData.forEach(function(h, i) {
+    var key = [h.agent || '', h.fileName || '', h.sid || '', h.source || ''].join('::');
+    globalIndexMap[key] = i;
+  });
+
+  var html = '';
+  var agentKeys = agentOrder.concat(Object.keys(groups).filter(function(k) { return agentOrder.indexOf(k) < 0; }));
+  agentKeys.forEach(function(agentId) {
+    var items = groups[agentId];
+    if (!items || items.length === 0) return;
+
+    var totalItems = items.length;
+    var totalPages = Math.max(1, Math.ceil(totalItems / HISTORY_PAGE_SIZE));
+    var currentPage = Math.min(historyGetPage(agentId), totalPages);
+    historySetPage(agentId, currentPage);
+
+    var startIdx = (currentPage - 1) * HISTORY_PAGE_SIZE;
+    var pageItems = items.slice(startIdx, startIdx + HISTORY_PAGE_SIZE);
+
+    var label = esc(getAgentLabel(agentId));
+    html += '<div class="history-group">' +
+      '<div class="history-group-header">' +
+        '<span class="history-group-name">' + label + '</span>' +
+        '<span class="history-group-count">' + totalItems + ' 条历史</span>' +
+      '</div>' +
+      '<div class="history-cards">';
+    pageItems.forEach(function(h) {
+      var key = [h.agent || '', h.fileName || '', h.sid || '', h.source || ''].join('::');
+      var gIdx = globalIndexMap[key];
+      html += renderHistoryCard(h, gIdx);
+    });
+    html += '</div>';
+
+    var canLoadMore = !!historyHasMoreByAgent[agentId];
+    var moreDisabled = canLoadMore ? '' : ' disabled';
+    html += '<div class="history-pagination">' +
+      '<button class="pg-btn"' + (currentPage <= 1 ? ' disabled' : '') + ' onclick="historyChangePage(\'' + agentId + '\',' + (currentPage - 1) + ')">上一页</button>' +
+      '<span class="pg-info">' + currentPage + ' / ' + totalPages + '</span>' +
+      '<button class="pg-btn"' + (currentPage >= totalPages ? ' disabled' : '') + ' onclick="historyChangePage(\'' + agentId + '\',' + (currentPage + 1) + ')">下一页</button>' +
+      '<button class="pg-btn"' + moreDisabled + ' onclick="historyLoadMore(\'' + agentId + '\')">加载更多</button>' +
+    '</div>';
+
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  renderTimelineView(list);
+}
+
+function historyChangePage(agentId, page) {
+  historySetPage(agentId, page);
+  historyApplyFilters();
+}
+
+function historyLoadMore(agentId) {
+  if (!historyHasMoreByAgent[agentId]) return;
+  loadHistory({ append: true, agents: [agentId], limit: HISTORY_FETCH_LIMIT });
+}
+
+function setHistoryView(mode) {
+  historyViewMode = mode === 'timeline' ? 'timeline' : 'list';
+  document.getElementById('history-view-list').classList.toggle('active', historyViewMode === 'list');
+  document.getElementById('history-view-timeline').classList.toggle('active', historyViewMode === 'timeline');
+  document.getElementById('history-groups').style.display = historyViewMode === 'list' ? '' : 'none';
+  document.getElementById('history-timeline').style.display = historyViewMode === 'timeline' ? 'flex' : 'none';
+}
+
+function filterHistory(keyword) {
+  historyApplyFilters();
+}
+
+function showDetail(idx) {
+  var h = historyData[idx];
+  if (!h) return;
+  openTaskModal({
+    type: 'history',
+    title: h.userRequirement || '（无描述）',
+    meta: getAgentLabel(h.agent) + ' · 完成时间：' + formatTime(h.completedAt),
+    tasks: h.tasks || []
+  });
+}
+
+function closeTaskModal() {
+  document.getElementById('detail-overlay').classList.add('hidden');
+}
+
+// 兼容旧调用
+function closeDetailModal() { closeTaskModal(); }
+
+function closeDetail(e) {
+  if (e.target === document.getElementById('detail-overlay')) closeTaskModal();
+}
+
+/**
+ * openTaskModal(data)
+ * data 格式：
+ *   { type: 'history', title, meta, tasks }
+ *   { type: 'taskgroup', title, meta, req, tasks }
+ */
+function openTaskModal(data) {
+  document.getElementById('detail-title').textContent = data.title || '（无标题）';
+  document.getElementById('detail-meta').textContent = data.meta || '';
+
+  var reqEl = document.getElementById('detail-req');
+  if (data.req) {
+    reqEl.textContent = data.req;
+    reqEl.style.display = 'block';
+  } else {
+    reqEl.textContent = '';
+    reqEl.style.display = 'none';
+  }
+
+  var tasks = data.tasks || [];
+  var html = '';
+  if (tasks.length === 0) {
+    html = '<div style="color:#475569;font-size:13px">暂无子任务记录</div>';
+  } else {
+    for (var i = 0; i < tasks.length; i++) {
+      var t = tasks[i];
+      var status = t.status || '';
+      var cls = status === 'completed' ? 'chip-done' : status === 'in_progress' ? 'chip-run' : status === 'blocked' ? 'chip-pending' : 'chip-pending';
+      var label = status === 'completed' ? 'DONE' : status === 'in_progress' ? 'RUN' : status === 'blocked' ? 'BLOCK' : 'WAIT';
+      var summary = t.completionSummary || t.summary || '';
+      var detail = t.description || t.detail || '';
+      var timeStr = t.completedAt ? formatTime(t.completedAt) : (t.createdAt ? formatTime(t.createdAt) : '');
+      // 构建时间信息行
+      var timeParts = [];
+      if (t.createdAt) timeParts.push('创建：' + formatTime(t.createdAt));
+      if (t.startedAt || t.executedAt) timeParts.push('开始：' + formatTime(t.startedAt || t.executedAt));
+      if (t.completedAt) timeParts.push('完成：' + formatTime(t.completedAt));
+      var timeInfo = timeParts.join('　');
+      // workLog 渲染
+      var workLogHtml = '';
+      var wl = t.workLog || t.work_log || [];
+      if (wl.length > 0) {
+        workLogHtml += '<div class="wl-section">';
+        workLogHtml += '<div class="wl-title">📋 Work Log (' + wl.length + ')</div>';
+        for (var j = 0; j < wl.length; j++) {
+          var w = wl[j];
+          var wTime = w.createdAt || w.time || w.timestamp || '';
+          var wAction = w.action || w.type || '';
+          var wContent = w.content || w.result || w.message || '';
+          var wFiles = w.files || w.relatedFiles || [];
+          workLogHtml += '<div class="wl-item">';
+          workLogHtml += '<div class="wl-item-header">';
+          if (wAction) workLogHtml += '<span class="wl-action">' + esc(wAction) + '</span>';
+          if (wTime) workLogHtml += '<span class="wl-time">' + esc(formatTime(wTime)) + '</span>';
+          workLogHtml += '</div>';
+          if (wContent) workLogHtml += '<div class="wl-content">' + esc(wContent) + '</div>';
+          if (wFiles.length > 0) {
+            workLogHtml += '<div class="wl-files">';
+            for (var k = 0; k < wFiles.length; k++) {
+              workLogHtml += '<span class="wl-file">' + esc(wFiles[k]) + '</span>';
+            }
+            workLogHtml += '</div>';
+          }
+          workLogHtml += '</div>';
+        }
+        workLogHtml += '</div>';
+      }
+      // 构建5个扩展字段 HTML
+      var extHtml = '';
+      var hasExt = t.implementationGuide || t.verificationCriteria || (t.relatedFiles && t.relatedFiles.length > 0) || t.analysisResult || t.notes;
+      if (hasExt) {
+        extHtml += '<div class="subtask-ext-section">';
+        if (t.implementationGuide) {
+          extHtml += '<div class="subtask-ext-item"><div class="subtask-ext-label">📋 实现指南</div><div class="subtask-ext-content">' + esc(t.implementationGuide) + '</div></div>';
+          extHtml += '<hr class="subtask-ext-divider">';
+        }
+        if (t.verificationCriteria) {
+          extHtml += '<div class="subtask-ext-item"><div class="subtask-ext-label">✅ 验收标准</div><div class="subtask-ext-content">' + esc(t.verificationCriteria) + '</div></div>';
+          extHtml += '<hr class="subtask-ext-divider">';
+        }
+        if (t.relatedFiles && t.relatedFiles.length > 0) {
+          extHtml += '<div class="subtask-ext-item"><div class="subtask-ext-label">📁 相关文件</div><div class="subtask-files-list">';
+          for (var rf = 0; rf < t.relatedFiles.length; rf++) {
+            var fp = t.relatedFiles[rf];
+            extHtml += '<div class="subtask-file-item">' +
+              '<span class="subtask-file-path" title="' + esc(fp) + '">' + esc(fp) + '</span>' +
+              '<button class="subtask-file-copy" onclick="copyFilePath(this,\'' + esc(fp).replace(/'/g,'&#39;') + '\')">复制</button>' +
+              '</div>';
+          }
+          extHtml += '</div></div>';
+          extHtml += '<hr class="subtask-ext-divider">';
+        }
+        if (t.analysisResult) {
+          extHtml += '<div class="subtask-ext-item"><div class="subtask-ext-label">🔍 分析结论</div><div class="subtask-ext-content">' + esc(t.analysisResult) + '</div></div>';
+          extHtml += '<hr class="subtask-ext-divider">';
+        }
+        if (t.notes) {
+          extHtml += '<div class="subtask-notes-box"><div class="subtask-notes-label">⚠️ 备注 / 踩坑</div><div class="subtask-notes-content">' + esc(t.notes) + '</div></div>';
+        }
+        extHtml += '</div>';
+      }
+      html += '<div class="subtask-item">' +
+        '<span class="subtask-status chip ' + cls + '">' + label + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="subtask-name">' + esc(t.name || t.title || '未命名') + '</div>' +
+        (detail ? '<div class="subtask-detail">' + esc(detail) + '</div>' : '') +
+        (summary ? '<div class="subtask-summary">✓ ' + esc(summary) + '</div>' : '') +
+        (timeInfo ? '<div class="subtask-time" style="color:#94a3b8;font-size:11px;margin-top:2px">' + esc(timeInfo) + '</div>' : '') +
+        workLogHtml +
+        extHtml +
+        '</div></div>';
+    }
+  }
+  document.getElementById('detail-subtasks').innerHTML = html;
+  document.getElementById('detail-overlay').classList.remove('hidden');
+}
+
+var AUTO_REFRESH_INTERVAL = 10;
+var countdown = AUTO_REFRESH_INTERVAL;
+var timer = null;
+var dashboardAutoRefreshEnabled = true;
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+function initServicesTab() {
+  loadServicesStatus();
+  currentServiceCountdown = 10;
+}
+
+function updateServiceCountdownDisplay() {
+  return;
+}
+
+function refreshServicesNow() {
+  currentServiceCountdown = 10;
+  loadServicesStatus();
+}
+
+function loadServicesStatus() {
+  fetch('/api/services/status').then(function(r){ return r.json(); }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || '加载失败');
+    renderServicesTable(data.services || []);
+  }).catch(function(e) {
+    renderServicesTable(null, e.message);
+  });
+}
+
+function renderServicesTable(list, error) {
+  var tbody = document.getElementById('services-body');
+  if (!tbody) return;
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="8" class="service-empty">加载失败：' + esc(error) + '</td></tr>';
+    return;
+  }
+  if (!list || list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="service-empty">暂无服务记录</td></tr>';
+    return;
+  }
+  // 排序：running 排最前，stopped/unknown 排后
+  var sorted = list.slice().sort(function(a, b) {
+    var order = { running: 0, stopped: 1, unknown: 2 };
+    var sa = order[(a.status || 'unknown').toLowerCase()] !== undefined ? order[(a.status || 'unknown').toLowerCase()] : 2;
+    var sb = order[(b.status || 'unknown').toLowerCase()] !== undefined ? order[(b.status || 'unknown').toLowerCase()] : 2;
+    return sa - sb;
+  });
+  _servicesData = sorted;
+  var rows = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var svc = sorted[i];
+    var typeCls = svc.type === 'docker' ? 'service-type-docker' : 'service-type-host';
+    var status = (svc.status || 'unknown').toLowerCase();
+    var statusCls = 'service-status-' + status;
+    var statusLabel = status === 'running' ? '运行中' : status === 'stopped' ? '已停止' : '未知';
+    var statusHtml = '<span class="service-status ' + statusCls + '"><span class="service-status-dot"></span>' + statusLabel + '</span>';
+    var dockerInfo = svc.type === 'docker'
+      ? ('容器 ' + esc(svc.dockerContainer || '-') + ' → ' + esc(svc.dockerPort || '-'))
+      : '-';
+    var pidText = svc.pid || '-';
+    var startTimeText = (status === 'running' && svc.startTime) ? esc(svc.startTime) : '<span style="color:#475569">-</span>';
+    var killDisabled = status !== 'running';
+    var cfPath = svc.configFile || '';
+    var cfDisplay = cfPath
+      ? '<span style="max-width:160px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="' + esc(cfPath) + '">' + esc(cfPath) + '</span>'
+      : '-';
+    var deleteBtn = (status === 'stopped' || status === 'unknown')
+      ? '<button class="btn-service-delete" onclick="deleteService(\'' + esc(svc.name) + '\')">删除</button>'
+      : '';
+    var svcJson = esc(JSON.stringify(svc));
+    rows += '<tr class="service-row" onclick="openServiceDetail(' + i + ')" style="cursor:pointer;">' +
+      '<td class="service-name">' + esc(svc.name) + '<small>' + esc(svc.startCommand || '') + '</small></td>' +
+      '<td>' + esc(svc.port) + '</td>' +
+      '<td><span class="service-type ' + typeCls + '">' + esc(svc.type) + '</span></td>' +
+      '<td>' + dockerInfo + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+      '<td style="font-size:12px;color:#94a3b8;white-space:nowrap">' + startTimeText + '</td>' +
+      '<td>' + esc(pidText) + '</td>' +
+      '<td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn-service-kill" onclick="killServicePort(' + svc.port + ')" ' + (killDisabled ? 'disabled' : '') + '>强杀</button> ' + deleteBtn + '</td>' +
+    '</tr>';
+  }
+  tbody.innerHTML = rows;
+}
+
+function killServicePort(port) {
+  var services = Array.isArray(_servicesData) ? _servicesData : [];
+  var svc = services.find(function(item) { return String(item.port) === String(port); });
+  var target = svc && svc.type === 'docker'
+    ? ('Docker 容器 ' + (svc.dockerContainer || svc.name || port))
+    : ('端口 ' + port + ' 的进程');
+  if (!confirm('确认强杀 ' + target + ' 吗？')) return;
+  fetch('/api/services/kill', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port: port })
+  }).then(function(r){ return r.json(); }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || '操作失败');
+    var successMsg = data.mode === 'docker-stop'
+      ? ('Docker 容器已停止：' + (data.stopped || (svc && (svc.dockerContainer || svc.name)) || port))
+      : ('端口 ' + port + ' 强杀成功');
+    showToast(successMsg, 'ok');
+    loadServicesStatus();
+  }).catch(function(e) {
+    showToast('强杀失败：' + e.message, 'err');
+  });
+}
+
+function deleteService(name) {
+  if (!confirm('确认删除服务记录「' + name + '」？')) return;
+  fetch('/api/services/' + encodeURIComponent(name), { method: 'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (!data.success) throw new Error(data.error || '删除失败');
+      showToast('服务「' + name + '」已删除', 'ok');
+      loadServicesStatus();
+    }).catch(function(e) {
+      showToast('删除失败：' + e.message, 'err');
+    });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function copyFilePath(btn, path) {
+  navigator.clipboard.writeText(path).then(function() {
+    var orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = '#4ade80';
+    btn.style.borderColor = '#22c55e';
+    setTimeout(function() { btn.textContent = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
+  }).catch(function() {
+    showToast('复制失败', 'err');
+  });
+}
+
+function renderChips(tasks) {
+  if (!tasks || tasks.length === 0) {
+    return '<span style="color:#475569;font-size:11px">暂无任务</span>';
+  }
+  var html = '';
+  var show = tasks.slice(0, 8);
+  for (var i = 0; i < show.length; i++) {
+    var t = show[i];
+    var cls = t.status === 'completed' ? 'chip-done' : t.status === 'in_progress' ? 'chip-run' : 'chip-pending';
+    var label = t.status === 'completed' ? 'DONE' : t.status === 'in_progress' ? 'RUN' : '…';
+    var name = esc((t.name || t.title || '').substring(0, 12));
+    html += '<span class="chip ' + cls + '" title="' + esc(t.name || '') + '">' + label + ' ' + name + '</span>';
+  }
+  if (tasks.length > 8) {
+    html += '<span class="chip chip-pending">+'+(tasks.length - 8) + '</span>';
+  }
+  return html;
+}
+
+/**
+ * 多状态判断，优先级从高到低：
+ * 1. 有子任务 且 全部 completed → 'done'（已完成）
+ * 2. 有任意子任务 status === 'blocked' → 'blocked'（阻塞）
+ * 3. 有未完成子任务 + spawnStatus === 'active' → 'running'（活跃）
+ * 4. 有未完成子任务 + spawnStatus !== 'active' → 'disconnected'（断联）
+ * 5. 没有子任务（tasks 为空） → 'unplanned'（未规划）
+ */
+function getAllTasks(a) {
+  var tasks = a.tasks || [];
+  var allSessions = a.sessions || [];
+  if (tasks.length > 0) return tasks;
+  var result = [];
+  allSessions.forEach(function(s) { result = result.concat(s.tasks || []); });
+  return result;
+}
+
+function getAgentStatus(a) {
+  var allTasks = getAllTasks(a);
+
+  // 优先级 5：没有子任务
+  if (allTasks.length === 0) return 'unplanned';
+
+  // 优先级 1：全部完成
+  if (allTasks.every(function(t) { return t.status === 'completed'; })) return 'done';
+
+  // 优先级 2：有阻塞任务
+  var hasBlocked = allTasks.some(function(t) { return t.status === 'blocked'; });
+  if (!hasBlocked) {
+    hasBlocked = (a.sessions || []).some(function(s) { return s.hasBlockedTasks; });
+  }
+  if (hasBlocked) return 'blocked';
+
+  // 优先级 3 & 4：有未完成任务，看 spawnStatus
+  return a.spawnStatus === 'active' ? 'running' : 'disconnected';
+}
+
+function isAllTasksDone(a) { return getAgentStatus(a) === 'done'; }
+
+// 保留旧函数兼容
+function isAgentActive(a) { return getAgentStatus(a) === 'running'; }
+
+function renderBlockedTask(t, agentId, sessionId) {
+  var blockInfo = t.blockInfo || {};
+  var blockType = blockInfo.blockType || 'question';
+  var taskId = esc(t.id || '');
+  var taskName = esc(t.name || '未命名');
+  var reason = esc(blockInfo.reason || '');
+  var sidEsc = esc(sessionId || 'default');
+
+  var badgeCls = blockType === 'queue' ? 'blocked-badge blocked-queue-badge' : 'blocked-badge';
+  var badgeText = blockType === 'queue' ? '⏳ 排队等待' : '❓ 待解答';
+
+  var bodyHtml = '';
+  if (blockType === 'question') {
+    var question = esc(blockInfo.question || '');
+    bodyHtml = '<div class="blocked-question">' + question + '</div>' +
+      '<div class="unblock-area">' +
+        '<button class="btn-unblock" onclick="promptUnblockModal(\'' + esc(agentId) + '\',\'' + taskId + '\',\'' + sidEsc + '\',\'' + taskName + '\')">解除阻塞</button>' +
+      '</div>';
+  } else {
+    var waitingFor = esc(blockInfo.waitingFor || '');
+    bodyHtml = '<div class="blocked-waiting">等待中：' + waitingFor + '</div>';
+  }
+
+  return '<div class="blocked-card">' +
+    '<div class="blocked-card-header">' +
+      '<span class="' + badgeCls + '">' + badgeText + '</span>' +
+      '<span class="blocked-task-name">' + taskName + '</span>' +
+    '</div>' +
+    (reason ? '<div class="blocked-reason">原因：' + reason + '</div>' : '') +
+    bodyHtml +
+  '</div>';
+}
+
+function renderSessionGroup(session, agentId) {
+  var sid = session.sessionId || 'default';
+  var tasks = session.tasks || [];
+  var blockedTasks = tasks.filter(function(t) { return t.status === 'blocked'; });
+  var activeTasks = tasks.filter(function(t) { return t.status !== 'blocked'; });
+
+  var blockedLabel = blockedTasks.length > 0 ? '<span class="session-group-blocked">⚠ ' + blockedTasks.length + ' 阻塞</span>' : '';
+  var html = '<div class="session-group">' +
+    '<div class="session-group-header">' +
+      '<span class="session-group-id">' + esc(sid) + '</span>' +
+      '<span style="color:#475569">(' + tasks.length + ' 任务)</span>' +
+      blockedLabel +
+    '</div>';
+
+  // 先渲染阻塞任务
+  for (var i = 0; i < blockedTasks.length; i++) {
+    html += renderBlockedTask(blockedTasks[i], agentId, sid);
+  }
+  // 再渲染普通任务 chips
+  if (activeTasks.length > 0) {
+    html += '<div class="task-chips">' + renderChips(activeTasks) + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderCard(a) {
+  var label = esc(a.name || getAgentLabel(a.agentId || a.agent));
+  var status = getAgentStatus(a);
+
+  // 状态徽章配置（5种新状态）
+  var statusConfig = {
+    'done':         { cls: 'status-done',         text: '🟢 已完成' },
+    'blocked':      { cls: 'status-blocked',       text: '🟠 阻塞' },
+    'running':      { cls: 'status-active',        text: '🔵 活跃' },
+    'disconnected': { cls: 'status-disconnected',  text: '🔴 断联' },
+    'unplanned':    { cls: 'status-idle',          text: '⚪ 未规划' },
+  };
+  var sc = statusConfig[status] || statusConfig['unplanned'];
+  var badgeCls = sc.cls;
+  var badgeText = sc.text;
+
+  var reqRaw = a.userRequirement || '暂无任务需求';
+  var req = esc(reqRaw.length > 60 ? reqRaw.substring(0, 60) + '…' : reqRaw);
+  var p = a.progress;
+  var pctText = p.done + '/' + p.total + ' 完成 · ' + p.running + ' 执行中 · ' + p.pending + ' 待处理';
+  if (p.blocked) pctText += ' · ' + p.blocked + ' 阻塞';
+  var agentId = esc(a.agent);
+  var agentLabel = esc(a.name || getAgentLabel(a.agentId || a.agent));
+
+  var hasTasks = a.tasks && a.tasks.length > 0;
+  var archiveBtn = hasTasks ? '<button class="btn btn-archive" onclick="promptArchive(\'' + agentId + '\', \'' + agentLabel + '\')">归档</button>' : '';
+
+  // 阻塞中：在卡片顶部显示阻塞提示
+  var blockedBanner = '';
+  if (status === 'blocked') {
+    var blockedTasks = (a.tasks || []).filter(function(t) { return t.status === 'blocked'; });
+    if (blockedTasks.length > 0) {
+      blockedBanner = '<div class="blocked-banner">⚠ ' + blockedTasks.length + ' 个任务阻塞中</div>';
+    }
+  }
+
+  // 断联：显示橙红色警告
+  var disconnectedBanner = '';
+  if (status === 'disconnected') {
+    disconnectedBanner = '<div class="disconnected-banner">🔴 run 已断联</div>';
+  }
+
+  // 任务区域：优先按 session 分组展示（含阻塞任务），否则回退到 chips
+  var tasksHtml = '';
+  var sessions = a.sessions || [];
+  // 过滤掉空 session
+  var nonEmptySessions = sessions.filter(function(s) { return s.tasks && s.tasks.length > 0; });
+  if (nonEmptySessions.length > 0) {
+    for (var i = 0; i < nonEmptySessions.length; i++) {
+      tasksHtml += renderSessionGroup(nonEmptySessions[i], a.agent);
+    }
+  } else {
+    tasksHtml = '<div class="task-chips">' + renderChips(a.tasks) + '</div>';
+  }
+
+  return '<div class="card" id="card-' + agentId + '">' +
+    '<div class="card-header">' +
+      '<span class="agent-name">' + label + '</span>' +
+      '<span class="status-badge ' + badgeCls + '">' + badgeText + '</span>' +
+    '</div>' +
+    blockedBanner +
+    disconnectedBanner +
+    '<div class="req-text">' + req + '</div>' +
+    '<div class="progress-bar-wrap"><div class="progress-bar" style="width:' + p.pct + '%"></div></div>' +
+    '<div class="progress-text">' + pctText + ' (' + p.pct + '%)</div>' +
+    tasksHtml +
+    '<div class="card-footer">' +
+      '<button class="btn btn-detail" onclick="goDetail(\'' + agentId + '\')">详情</button>' +
+      archiveBtn +
+    '</div>' +
+  '</div>';
+}
+
+
+function sortAgents(agents) {
+  return agents;
+}
+
+function loadData() {
+  fetch('/api/agents').then(function(res) {
+    return res.json();
+  }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || '请求失败');
+    // 初始化 agent 配置和部门过滤
+    if (data.agentConfigs) {
+      setAgentConfigs(data.agentConfigs);
+      deptInitCheckboxes();
+      if (document.getElementById('history-dept-filter-items')) {
+        historyDeptInitCheckboxes();
+      }
+    }
+    var sorted = sortAgents(data.agents);
+    sorted.forEach(function(a) { agentDataCache[a.agent] = a; });
+    var gridEl = document.getElementById('grid');
+    if (gridEl) gridEl.innerHTML = sorted.map(renderCard).join('');
+  }).catch(function(e) {
+    var gridEl = document.getElementById('grid');
+    if (gridEl) gridEl.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+  });
+}
+
+
+function goDetail(agentId) {
+  window.location.href = '/detail.html?agent=' + agentId;
+}
+
+var _archivePendingAgent = null;
+
+function promptArchive(agentId, agentLabel) {
+  _archivePendingAgent = agentId;
+  document.getElementById('confirm-msg').textContent = '确认归档 ' + agentLabel + ' 的所有任务？此操作不可撤销。';
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+
+function getTgBatchKey(agentId, sessionId) {
+  return String(agentId || '') + '::' + String(sessionId || '');
+}
+
+function enterBatchArchiveMode() {
+  tgBatchMode = true;
+  tgBatchSelected = {};
+  updateBatchArchiveBar();
+  loadTaskGroups();
+}
+
+function cancelBatchArchiveMode() {
+  tgBatchMode = false;
+  tgBatchSelected = {};
+  _tgBatchArchivePending = null;
+  updateBatchArchiveBar();
+  loadTaskGroups();
+}
+
+function toggleTgBatchSelect(evt, agentId, sessionId) {
+  if (evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+  }
+  var key = getTgBatchKey(agentId, sessionId);
+  if (tgBatchSelected[key]) delete tgBatchSelected[key];
+  else tgBatchSelected[key] = { agentId: agentId, sessionId: sessionId };
+  updateBatchArchiveBar();
+  loadTaskGroups();
+}
+
+function getVisibleDeptAgentIds() {
+  var selected = deptGetSelected();
+  return selected.length > 0 ? selected : [];
+}
+
+function getBatchSelectableGroups() {
+  var visibleAgentIds = getVisibleDeptAgentIds();
+  return (TASK_GROUPS_DATA || []).filter(function(g) {
+    if (!(g && g.agent && g.sid)) return false;
+    return visibleAgentIds.indexOf(g.agent) >= 0;
+  }).map(function(g) {
+    return { agentId: g.agent, sessionId: g.sid };
+  });
+}
+
+function getBatchSelectedGroups() {
+  return Object.keys(tgBatchSelected).map(function(key) { return tgBatchSelected[key]; }).filter(Boolean);
+}
+
+function syncBatchMasterCheckbox() {
+  var master = document.getElementById('tg-batch-master-checkbox');
+  var masterText = document.getElementById('tg-batch-master-text');
+  if (!master || !masterText) return;
+  var selectable = getBatchSelectableGroups();
+  var selected = getBatchSelectedGroups();
+  var total = selectable.length;
+  var selectedCount = selected.length;
+  master.disabled = total === 0;
+  master.checked = total > 0 && selectedCount === total;
+  master.indeterminate = selectedCount > 0 && selectedCount < total;
+  masterText.textContent = master.checked ? '全取消' : '全选';
+  master.setAttribute('aria-checked', master.indeterminate ? 'mixed' : (master.checked ? 'true' : 'false'));
+}
+
+function toggleBatchSelectAll(checked) {
+  var selectable = getBatchSelectableGroups();
+  tgBatchSelected = {};
+  if (checked) {
+    selectable.forEach(function(item) {
+      tgBatchSelected[getTgBatchKey(item.agentId, item.sessionId)] = item;
+    });
+  }
+  updateBatchArchiveBar();
+  loadTaskGroups();
+}
+
+function updateBatchArchiveBar() {
+  var toolbar = document.getElementById('tg-toolbar');
+  var bar = document.getElementById('tg-batch-bar');
+  var info = document.getElementById('tg-batch-info');
+  var btn = document.getElementById('btn-batch-confirm');
+  if (!toolbar || !bar || !info || !btn) return;
+  if (!tgBatchMode) {
+    toolbar.style.display = 'flex';
+    bar.style.display = 'none';
+    return;
+  }
+  toolbar.style.display = 'none';
+  bar.style.display = 'flex';
+  var selected = getBatchSelectedGroups();
+  var selectable = getBatchSelectableGroups();
+  syncBatchMasterCheckbox();
+  info.textContent = selected.length > 0
+    ? ('已选择 ' + selected.length + ' / ' + selectable.length + ' 个任务组，勾选后可批量归档')
+    : '已进入批量归档模式，请勾选要归档的任务组';
+  btn.disabled = selected.length === 0;
+  btn.textContent = '确认归档';
+}
+
+function promptBatchArchive() {
+  var selected = getBatchSelectedGroups();
+  if (selected.length === 0) {
+    showToast('请先选择至少一个任务组', 'err');
+    return;
+  }
+  var selectedNames = selected.map(function(item) {
+    var label = getAgentLabel(item.agentId);
+    return label + ' · ' + item.sessionId;
+  });
+  _tgBatchArchivePending = selected;
+  document.getElementById('confirm-msg').innerHTML = '确认归档 <strong>' + selected.length + '</strong> 个任务组？<br><br>' + selectedNames.map(function(name) {
+    return '• ' + esc(name);
+  }).join('<br>');
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+
+function archiveSessionsSequentially(items) {
+  var index = 0;
+  function next() {
+    if (index >= items.length) {
+      showToast('✅ 已归档 ' + items.length + ' 个任务组', 'ok');
+      cancelBatchArchiveMode();
+      setTimeout(loadTaskGroups, 800);
+      return;
+    }
+    var item = items[index++];
+    fetch('/api/archive-session', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({agentId:item.agentId, sessionId:item.sessionId})
+    }).then(function(r){ return r.json(); }).then(function(data) {
+      if (!data.ok) throw new Error(data.error || '归档失败');
+      next();
+    }).catch(function(e) {
+      showToast('❌ 批量归档中断：' + e.message, 'err');
+      updateBatchArchiveBar();
+    });
+  }
+  next();
+}
+
+function closeConfirm() {
+  _archivePendingAgent = null;
+  if (!_tgBatchArchivePending) _tgArchivePending = null;
+  document.getElementById('confirm-overlay').classList.add('hidden');
+}
+
+function confirmArchive() {
+  if (_tgBatchArchivePending) {
+    var batchItems = _tgBatchArchivePending.slice();
+    _tgBatchArchivePending = null;
+    closeConfirm();
+    var batchBtn = document.getElementById('btn-batch-confirm');
+    if (batchBtn) {
+      batchBtn.disabled = true;
+      batchBtn.textContent = '归档中…';
+    }
+    archiveSessionsSequentially(batchItems);
+    return;
+  }
+  if (_tgArchivePending) {
+    var p = _tgArchivePending; _tgArchivePending = null;
+    closeConfirm();
+    fetch('/api/archive-session', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agentId:p.agentId,sessionId:p.sessionId})})
+      .then(function(r){return r.json();}).then(function(d){if(d.ok){showToast('✅ 归档成功','ok');setTimeout(loadTaskGroups,1000);}else throw new Error(d.error);})
+      .catch(function(e){showToast('❌ 归档失败: '+e.message,'err');});
+    return;
+  }
+  var agentId = _archivePendingAgent;
+  if (!agentId) return;
+  closeConfirm();
+  var btn = document.querySelector('.card#card-' + agentId + ' .btn-archive');
+  if (btn) { btn.disabled = true; btn.textContent = '归档中…'; }
+  fetch('/api/archive/' + agentId, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        showToast('✅ ' + agentId + ' 归档指令已发送', 'ok');
+        setTimeout(loadData, 1500);
+      } else {
+        throw new Error(data.error || '归档失败');
+      }
+    })
+    .catch(function(e) {
+      showToast('❌ 归档失败: ' + e.message, 'err');
+      if (btn) { btn.disabled = false; btn.textContent = '归档'; }
+    });
+}
+
+function updateRefreshToggleUI() {
+  var toggle = document.getElementById('refresh-toggle');
+  var label = document.getElementById('refresh-toggle-label');
+  var countdownEl = document.getElementById('countdown');
+  if (!toggle || !label || !countdownEl) return;
+  toggle.classList.toggle('is-paused', !dashboardAutoRefreshEnabled);
+  countdownEl.classList.toggle('is-paused', !dashboardAutoRefreshEnabled);
+  label.textContent = dashboardAutoRefreshEnabled ? '自动刷新' : '已暂停';
+  toggle.title = dashboardAutoRefreshEnabled
+    ? '绿色表示自动刷新运行中；点击后暂停。'
+    : '红色表示自动刷新已暂停；再次点击会立即刷新并恢复 10 秒自动刷新。';
+  countdownEl.innerHTML = dashboardAutoRefreshEnabled
+    ? '<span class="countdown-text"><span class="countdown-value">' + countdown + '</span><span class="countdown-unit">s</span></span>'
+    : '<span class="countdown-icon">⏸</span><span class="countdown-text"><span class="countdown-value">暂停</span></span>';
+}
+
+function resetDashboardRefreshTimer() {
+  countdown = AUTO_REFRESH_INTERVAL;
+  updateRefreshToggleUI();
+}
+
+function triggerDashboardRefresh(options) {
+  options = options || {};
+  if (currentTab === 'groups') loadTaskGroups();
+  else if (currentTab === 'history') loadHistory({ agents: getHistorySelectedAgentsForRequest(), limit: HISTORY_FETCH_LIMIT });
+  if (options.resetTimer !== false) resetDashboardRefreshTimer();
+}
+
+function toggleDashboardRefresh() {
+  if (dashboardAutoRefreshEnabled) {
+    dashboardAutoRefreshEnabled = false;
+    updateRefreshToggleUI();
+    return;
+  }
+  dashboardAutoRefreshEnabled = true;
+  triggerDashboardRefresh({ resetTimer: true });
+}
+
+function startCountdown() {
+  clearInterval(timer);
+  resetDashboardRefreshTimer();
+  timer = setInterval(function() {
+    if (!dashboardAutoRefreshEnabled) {
+      updateRefreshToggleUI();
+      return;
+    }
+    countdown--;
+    if (countdown <= 0) {
+      triggerDashboardRefresh({ resetTimer: true });
+      return;
+    }
+    updateRefreshToggleUI();
+  }, 1000);
+}
+
+var TASK_GROUPS_DATA = [];
+var tgBatchMode = false;
+var tgBatchSelected = {};
+var _tgBatchArchivePending = null;
+
+function sortTaskGroupsByLatest(groups) {
+  return (groups || []).slice().sort(function(a, b) {
+    var diff = getTimeValue(b && b.lastUpdatedAt) - getTimeValue(a && a.lastUpdatedAt);
+    if (diff !== 0) return diff;
+    return String((a && a.sid) || '').localeCompare(String((b && b.sid) || ''));
+  });
+}
+
+function loadTaskGroups() {
+  fetch('/api/task-groups').then(function(r){ return r.json(); }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || 'error');
+    TASK_GROUPS_DATA = sortTaskGroupsByLatest(data.groups || []);
+    var grid = document.getElementById('sg-grid');
+    if (!grid) return;
+    if (TASK_GROUPS_DATA.length === 0) { grid.innerHTML = '<div class="empty">暂无任务组</div>'; return; }
+    grid.innerHTML = TASK_GROUPS_DATA.map(renderTgCard).join('');
+  }).catch(function(e) {
+    var grid = document.getElementById('sg-grid');
+    if (grid) grid.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+  });
+}
+
+function getTgCardStatus(g) {
+  var tasks = g.tasks || [];
+  // 5: 没有子任务
+  if (tasks.length === 0) return 'unplanned';
+  // 1: 全部完成
+  if (tasks.every(function(t){ return t.status === 'completed'; })) return 'done';
+  // 2: 有阻塞
+  if (tasks.some(function(t){ return t.status === 'blocked'; })) return 'blocked';
+  // 3 & 4: 有未完成任务，看 spawnStatus
+  return g.spawnStatus === 'active' ? 'running' : 'disconnected';
+}
+
+function renderTgCard(g) {
+  var agentLabel = esc((g.agentConfig && g.agentConfig.name) || g.agentName || getAgentLabel(g.agentId || g.agent));
+  var p = g.progress || {total:0, done:0, inProgress:0, blocked:0, cancelled:0};
+  var pct = p.total > 0 ? Math.round(p.done / p.total * 100) : 0;
+  var inProgressCount = p.inProgress || p.running || 0;
+
+  var tgStatus = getTgCardStatus(g);
+  var statusConfig = {
+    'done':         { cardCls: ' status-done',         badgeCls: 'status-badge status-done',         text: '🟢 已完成' },
+    'blocked':      { cardCls: ' status-blocked',       badgeCls: 'status-badge status-blocked',       text: '🟠 阻塞' },
+    'running':      { cardCls: ' status-active',        badgeCls: 'status-badge status-active',        text: '🔵 活跃' },
+    'disconnected': { cardCls: ' status-disconnected',  badgeCls: 'status-badge status-disconnected',  text: '🔴 断联' },
+    'unplanned':    { cardCls: '',                      badgeCls: 'status-badge status-idle',          text: '⚪ 未规划' },
+  };
+  var sc = statusConfig[tgStatus] || statusConfig['unplanned'];
+  var batchKey = getTgBatchKey(g.agent, g.sid);
+  var batchChecked = !!tgBatchSelected[batchKey];
+  var allowBatch = !!(g.agent && g.sid);
+  var cardCls = sc.cardCls + (tgBatchMode ? ' select-mode' : '') + (batchChecked ? ' selected' : '');
+  var badgeCls = sc.badgeCls;
+  var badgeText = sc.text;
+
+  var req = esc((g.userRequirement || '暂无描述').substring(0, 80));
+  var progressText = p.done + '/' + p.total + ' 完成';
+  if (inProgressCount) progressText += ' · ' + inProgressCount + ' 执行中';
+  if (p.blocked) progressText += ' · ' + p.blocked + ' 阻塞';
+  var agentId = esc(g.agent);
+  var sid = esc(g.sid || '');
+  var filename = esc(g.filename || '');
+  var cardId = 'tg-' + agentId + '-' + sid;
+  var tasks = g.tasks || [];
+  var chipsHtml = renderTgChips(tasks);
+  var blockedHtml = '';
+  tasks.filter(function(t){ return t.status === 'blocked'; }).forEach(function(t) {
+    blockedHtml += renderBlockedTaskCard(t, agentId, sid);
+  });
+  var detailHtml = '<div class="sg-detail" id="detail-' + cardId + '">' + renderTgSubtasks(tasks) + '</div>';
+  var singleArchiveBtn = tgBatchMode ? '' : '<button class="btn btn-sg-archive" onclick="promptTgArchive(\'' + agentId + '\',\'' + sid + '\')">归档</button>';
+  var footerHtml = '<div class="sg-footer">' +
+    '<button class="btn btn-sg-detail" onclick="toggleTgDetail(\'' + cardId + '\', this)">详情</button>' +
+    singleArchiveBtn +
+  '</div>';
+  var checkboxHtml = '';
+  if (tgBatchMode) {
+    checkboxHtml = '<label class="sg-select-wrap' + (batchChecked ? ' is-selected' : '') + '" title="选择此任务组归档" onclick="toggleTgBatchSelect(event, \'' + esc(g.agent) + '\', \'' + esc(g.sid || '') + '\')">' +
+      '<input type="checkbox" ' + (batchChecked ? 'checked ' : '') + (allowBatch ? '' : 'disabled ') + '>' +
+      '<span class="sg-select-text">' + (batchChecked ? '✓ 已选中' : '点击选择') + '</span>' +
+    '</label>';
+  }
+  return '<div class="sg-card' + cardCls + '" id="card-' + cardId + '">' +
+    checkboxHtml +
+    '<div class="sg-card-header"><span class="sg-title">' + agentLabel + ' · ' + sid + '</span>' +
+    '<span class="' + badgeCls + '">' + badgeText + '</span></div>' +
+    '<div class="sg-req">' + req + '</div>' +
+    '<div class="progress-bar-wrap"><div class="progress-bar" style="width:' + pct + '%"></div></div>' +
+    '<div class="progress-text">' + progressText + ' (' + pct + '%)</div>' +
+    blockedHtml +
+    '<div class="task-chips">' + chipsHtml + '</div>' +
+    detailHtml + footerHtml + '</div>';
+}
+
+function renderTgChips(tasks) {
+  if (!tasks || tasks.length === 0) return '<span style="color:#475569;font-size:11px">暂无任务</span>';
+  var show = tasks.slice(0, 10);
+  var html = '';
+  for (var i = 0; i < show.length; i++) {
+    var t = show[i];
+    var cls = t.status === 'completed' ? 'chip-done' : t.status === 'in_progress' ? 'chip-run' : t.status === 'blocked' ? 'chip-pending' : 'chip-pending';
+    var label = t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '▶' : t.status === 'blocked' ? '⚠' : '…';
+    html += '<span class="chip ' + cls + '" title="' + esc(t.name || '') + '">' + label + ' ' + esc((t.name || '').substring(0,10)) + '</span>';
+  }
+  if (tasks.length > 10) html += '<span class="chip chip-pending">+' + (tasks.length - 10) + '</span>';
+  return html;
+}
+
+function renderTgSubtasks(tasks) {
+  if (!tasks || tasks.length === 0) return '<div style="color:#475569;font-size:12px">暂无子任务</div>';
+  var html = '';
+  for (var i = 0; i < tasks.length; i++) {
+    var t = tasks[i];
+    var cls = t.status === 'completed' ? 'chip-done' : t.status === 'in_progress' ? 'chip-run' : 'chip-pending';
+    var label = t.status === 'completed' ? 'DONE' : t.status === 'in_progress' ? 'RUN' : t.status === 'blocked' ? 'BLOCK' : 'WAIT';
+    var summary = t.completionSummary || t.summary || '';
+    html += '<div class="subtask-item"><span class="subtask-status chip ' + cls + '">' + label + '</span>' +
+      '<div><div class="subtask-name">' + esc(t.name || t.title || '未命名') + '</div>' +
+      (summary ? '<div class="subtask-summary">✓ ' + esc(summary) + '</div>' : '') +
+      '</div></div>';
+  }
+  return html;
+}
+
+function renderBlockedTaskCard(t, agentId, sid) {
+  var blockInfo = t.blockInfo || {};
+  var taskId = esc(t.id || '');
+  var taskName = esc(t.name || '未命名');
+  var reason = esc(blockInfo.reason || '');
+  var question = esc(blockInfo.question || '');
+  return '<div class="blocked-card"><div class="blocked-card-header">' +
+    '<span class="blocked-badge">❓ 待解答</span>' +
+    '<span class="blocked-task-name">' + taskName + '</span></div>' +
+    (reason ? '<div class="blocked-reason">原因：' + reason + '</div>' : '') +
+    (question ? '<div class="blocked-question">' + question + '</div>' : '') +
+    '<div class="unblock-area"><button class="btn-unblock" onclick="promptUnblockModal(\'' + esc(agentId) + '\',\'' + taskId + '\',\'' + esc(sid) + '\',\'' + taskName + '\')">解除阻塞</button></div></div>';
+}
+
+function toggleTgDetail(cardId, btn) {
+  // 从原始数据中查找对应任务组，避免 DOM 反解析丢失 description/workLog
+  // cardId 格式：tg-{agentId}-{sid}（使用完整 sid，避免前缀相同时匹配错误）
+  var grp = null;
+  if (typeof TASK_GROUPS_DATA !== 'undefined') {
+    for (var gi = 0; gi < TASK_GROUPS_DATA.length; gi++) {
+      var g = TASK_GROUPS_DATA[gi];
+      var agentId2 = g.agent || '';
+      var cid = 'tg-' + agentId2 + '-' + (g.sid || '');
+      if (cid === cardId) { grp = g; break; }
+    }
+  }
+  if (grp) {
+    var agentLabel = getAgentLabel(grp.agent);
+    openTaskModal({
+      type: 'taskgroup',
+      title: agentLabel + ' · ' + (grp.sid || ''),
+      meta: '',
+      req: grp.userRequirement || '',
+      tasks: grp.tasks || []
+    });
+    return;
+  }
+  // fallback：原有 DOM 解析逻辑
+  var card = document.getElementById('card-' + cardId);
+  if (!card) return;
+  var titleEl = card.querySelector('.sg-title');
+  var reqEl = card.querySelector('.sg-req');
+  var title = titleEl ? titleEl.textContent : cardId;
+  var req = reqEl ? reqEl.textContent : '';
+  openTaskModal({ type: 'taskgroup', title: title, meta: '', req: req, tasks: [] });
+}
+
+var _tgArchivePending = null;
+
+function promptTgArchive(agentId, sessionId) {
+  _tgArchivePending = {agentId: agentId, sessionId: sessionId};
+  var label = getAgentLabel(agentId);
+  document.getElementById('confirm-msg').textContent = '确认归档 ' + label + ' 的 session ' + sessionId.substring(0,8) + '… 的所有任务？此操作不可撤销。';
+  document.getElementById('confirm-overlay').classList.remove('hidden');
+}
+
+function doTgClaim(agentId, filename, btn) {
+  if (!filename) { showToast('无可激活的任务文件', 'err'); return; }
+  btn.disabled = true; btn.textContent = '激活中…';
+  fetch('/api/claim-session', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({agentId: agentId, filename: filename})
+  }).then(function(r){ return r.json(); }).then(function(data) {
+    btn.disabled = false; btn.textContent = '激活';
+    if (data.ok) { showToast('✅ 激活成功，代理已唤醒', 'ok'); setTimeout(loadTaskGroups, 1500); }
+    else throw new Error(data.error || '激活失败');
+  }).catch(function(e) {
+    btn.disabled = false; btn.textContent = '激活';
+    showToast('❌ 激活失败: ' + e.message, 'err');
+  });
+}
+// ── 部门过滤 ──────────────────────────────────────────────────────────────
+
+function getDeptAgents() {
+  return getConfiguredAgentsForFilters().map(function(item) {
+    return { id: item.agentId, label: item.name, code: item.code, workspace: item.workspace };
+  }).sort(function(a, b) {
+    return a.label.localeCompare(b.label, 'zh-CN');
+  });
+}
+var DEPT_FILTER_KEY = 'dashboard_agent_filter';
+
+function deptLoadSaved() {
+  var deptAgents = getDeptAgents();
+  var raw = localStorage.getItem(DEPT_FILTER_KEY);
+  if (!raw) return deptAgents.map(function(a){ return a.id; }); // 默认全选
+  try { return JSON.parse(raw); } catch(e) { return deptAgents.map(function(a){ return a.id; }); }
+}
+
+function deptSave(selected) {
+  localStorage.setItem(DEPT_FILTER_KEY, JSON.stringify(selected));
+}
+
+function deptGetSelected() {
+  var items = document.querySelectorAll('#dept-filter-items input[type=checkbox]');
+  var sel = [];
+  items.forEach(function(cb){ if (cb.checked) sel.push(cb.value); });
+  return sel;
+}
+
+function deptApplyFilter() {
+  var selected = deptGetSelected();
+  deptSave(selected);
+  var cards = document.querySelectorAll('#sg-grid .sg-card');
+  cards.forEach(function(card) {
+    var cardId = card.id;
+    var found = false;
+    var deptAgents = getDeptAgents();
+    for (var i = 0; i < deptAgents.length; i++) {
+      var a = deptAgents[i];
+      if (cardId.indexOf('card-tg-' + a.id + '-') === 0) {
+        card.style.display = selected.indexOf(a.id) >= 0 ? '' : 'none';
+        found = true;
+        break;
+      }
+    }
+    if (!found) card.style.display = 'none';
+  });
+}
+
+function deptSelectAll() {
+  document.querySelectorAll('#dept-filter-items input[type=checkbox]').forEach(function(cb){ cb.checked = true; });
+  deptApplyFilter();
+}
+
+function deptSelectNone() {
+  document.querySelectorAll('#dept-filter-items input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  deptApplyFilter();
+}
+
+function deptInitCheckboxes() {
+  var container = document.getElementById('dept-filter-items');
+  if (!container) return;
+  var deptAgents = getDeptAgents();
+  var agentIds = deptAgents.map(function(a) { return a.id; });
+  var saved = syncSavedDeptSelection(DEPT_FILTER_KEY, agentIds);
+  container.innerHTML = '';
+  deptAgents.forEach(function(a) {
+    var checked = saved.indexOf(a.id) >= 0;
+    var label = document.createElement('label');
+    label.className = 'dept-checkbox-item';
+    label.innerHTML = '<input type="checkbox" value="' + a.id + '"' + (checked ? ' checked' : '') + '><span>' + a.label + '</span>';
+    label.querySelector('input').addEventListener('change', deptApplyFilter);
+    container.appendChild(label);
+  });
+}
+
+// 渲染任务组数据的公共逻辑
+function processTaskGroupsData(data) {
+  if (data.agentConfigs) setAgentConfigs(data.agentConfigs);
+  deptInitCheckboxes();
+  // 若历史任务筛选容器已存在，一并刷新
+  if (document.getElementById('history-dept-filter-items')) {
+    historyDeptInitCheckboxes();
+  }
+  TASK_GROUPS_DATA = sortTaskGroupsByLatest(data.groups || []);
+  var validKeys = {};
+  TASK_GROUPS_DATA.forEach(function(g) {
+    validKeys[getTgBatchKey(g.agent, g.sid)] = true;
+  });
+  Object.keys(tgBatchSelected).forEach(function(key) {
+    if (!validKeys[key]) delete tgBatchSelected[key];
+  });
+  var grid = document.getElementById('sg-grid');
+  if (!grid) return;
+  grid.innerHTML = TASK_GROUPS_DATA.length === 0 ? '<div class="empty">暂无任务组</div>' : TASK_GROUPS_DATA.map(renderTgCard).join('');
+  deptApplyFilter();
+  updateBatchArchiveBar();
+}
+
+loadTaskGroups = function(prefetchedData) {
+  if (prefetchedData) {
+    processTaskGroupsData(prefetchedData);
+    return;
+  }
+  fetch('/api/task-groups').then(function(r){ return r.json(); }).then(function(data) {
+    if (!data.ok) throw new Error(data.error || 'error');
+    processTaskGroupsData(data);
+  }).catch(function(e) {
+    var grid = document.getElementById('sg-grid');
+    if (grid) grid.innerHTML = '<div class="empty">加载失败: ' + esc(e.message) + '</div>';
+  });
+};
+
+// 页面启动
+loadData();
+loadTaskGroups();
+startCountdown();
+
+// ── 历史任务部门过滤 ──────────────────────────────────────────────────────
+var HISTORY_DEPT_FILTER_KEY = 'dashboard_history_agent_filter';
+
+function historyDeptLoadSaved() {
+  var deptAgents = getDeptAgents();
+  var raw = localStorage.getItem(HISTORY_DEPT_FILTER_KEY);
+  if (!raw) return deptAgents.map(function(a){ return a.id; }); // 默认全选
+  try { return JSON.parse(raw); } catch(e) { return deptAgents.map(function(a){ return a.id; }); }
+}
+
+function historyDeptSave(selected) {
+  localStorage.setItem(HISTORY_DEPT_FILTER_KEY, JSON.stringify(selected));
+}
+
+function historyDeptGetSelected() {
+  var items = document.querySelectorAll('#history-dept-filter-items input[type=checkbox]');
+  var sel = [];
+  items.forEach(function(cb){ if (cb.checked) sel.push(cb.value); });
+  return sel;
+}
+
+var _lastHistoryDeptSelected = null;
+
+function historyApplyFilters() {
+  var kw = (document.getElementById('history-search-input') ? document.getElementById('history-search-input').value : '').trim().toLowerCase();
+  var selected = historyDeptGetSelected();
+  historyDeptSave(selected);
+  // 切换部门过滤时重置分页并按当前可见部门重拉
+  var selectedKey = selected.slice().sort().join(',');
+  if (_lastHistoryDeptSelected !== null && _lastHistoryDeptSelected !== selectedKey) {
+    historyResetPages();
+    loadHistory({ agents: getHistorySelectedAgentsForRequest(), limit: HISTORY_FETCH_LIMIT });
+    return;
+  }
+  _lastHistoryDeptSelected = selectedKey;
+  var filtered = historyData.filter(function(h) {
+    var matchKw = !kw || (h.userRequirement || '').toLowerCase().indexOf(kw) >= 0;
+    var matchDept = selected.length === 0 || selected.indexOf(h.agent) >= 0;
+    return matchKw && matchDept;
+  });
+  renderHistory(filtered);
+  if (historyViewMode === 'timeline') {
+    document.getElementById('history-groups').style.display = 'none';
+    document.getElementById('history-timeline').style.display = 'flex';
+  }
+}
+
+function historyDeptSelectAll() {
+  document.querySelectorAll('#history-dept-filter-items input[type=checkbox]').forEach(function(cb){ cb.checked = true; });
+  historyApplyFilters();
+}
+
+function historyDeptSelectNone() {
+  document.querySelectorAll('#history-dept-filter-items input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  historyApplyFilters();
+}
+
+function renderTimelineView(list) {
+  var container = document.getElementById('history-timeline');
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="timeline-empty">暂无历史任务</div>';
+    return;
+  }
+  // 外层按天分组，内层按代理分组
+  var groups = {};
+  list.forEach(function(entry) {
+    var agent = entry.agent || 'unknown';
+    var dateKey = formatTimelineDate(entry.completedAt || entry.createdAt);
+    if (!dateKey) return;
+    groups[dateKey] = groups[dateKey] || {};
+    groups[dateKey][agent] = groups[dateKey][agent] || [];
+    groups[dateKey][agent].push(entry);
+  });
+  var html = '';
+  // 外层：按天降序排列
+  var dateKeys = Object.keys(groups).sort(function(a,b){ return b.localeCompare(a); });
+  dateKeys = dateKeys.filter(function(dateKey) {
+    var agents = groups[dateKey];
+    return Object.keys(agents).some(function(a){ return agents[a] && agents[a].length > 0; });
+  });
+  dateKeys.forEach(function(dateKey) {
+    var agents = groups[dateKey];
+    var agentKeys = Object.keys(agents).sort(function(a,b){ return getAgentLabel(a).localeCompare(getAgentLabel(b)); });
+    agentKeys = agentKeys.filter(function(a){ return agents[a] && agents[a].length > 0; });
+    if (agentKeys.length === 0) return;
+    var totalCount = agentKeys.reduce(function(sum, a){ return sum + agents[a].length; }, 0);
+    // 外层：天块，复用 timeline-agent-block 样式
+    html += '<div class="timeline-agent-block">' +
+      '<div class="timeline-agent-header">' +
+        '<span class="timeline-agent-name">' + esc(dateKey) + '</span>' +
+        '<span class="timeline-agent-count">' + totalCount + ' 条记录</span>' +
+      '</div>';
+    // 内层：每个代理
+    agentKeys.forEach(function(agent) {
+      var entries = agents[agent];
+      if (!entries || entries.length === 0) return;
+      html += '<div class="timeline-day">' +
+        '<div class="timeline-day-header">' +
+          '<span class="timeline-day-label">' + esc(getAgentLabel(agent)) + '</span>' +
+          '<span class="timeline-day-count">' + entries.length + ' 条</span>' +
+        '</div>';
+      entries.sort(function(a,b) {
+        return getTimeValue(b.completedAt || b.createdAt) - getTimeValue(a.completedAt || a.createdAt);
+      }).forEach(function(entry) {
+        var status = calcHistoryStatus(entry.tasks);
+        var badgeCls = status === 'done' ? 'done' : status === 'blocked' ? 'blocked' : status === 'error' ? 'error' : status === 'incomplete' ? 'incomplete' : 'default';
+        var timeLabel = formatTime(entry.completedAt || entry.createdAt);
+        var title = entry.userRequirement || '（无描述）';
+        var tasks = entry.tasks || [];
+        var doneCount = tasks.filter(function(t){ return t.status === 'completed'; }).length;
+        var taskMeta = doneCount + '/' + tasks.length + ' 完成';
+        var extra = [];
+        var duration = calcDuration(tasks);
+        if (duration) extra.push('耗时 ' + duration);
+        var tokens = calcTokens(tasks);
+        if (tokens) extra.push('Token ' + tokens);
+        var globalIdx = historyData.indexOf(entry);
+        var taskChips = renderTimelineTaskChips(tasks);
+        html += '<div class="timeline-item status-' + badgeCls + '" onclick="toggleTimelineEntry(' + globalIdx + ')">' +
+          '<div class="timeline-item-time">' + esc(timeLabel) + '</div>' +
+          '<div class="timeline-item-title">' + esc(title) + '</div>' +
+          '<div class="timeline-item-meta">' +
+            '<span class="timeline-badge ' + badgeCls + '">' + esc(statusLabel(status)) + '</span>' +
+            '<span>' + esc(taskMeta) + '</span>' +
+            (taskChips ? '<span>' + taskChips + '</span>' : '') +
+          '</div>' +
+          (extra.length ? '<div class="timeline-item-extra">' + extra.map(esc).join(' · ') + '</div>' : '') +
+        '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  container.innerHTML = html || '<div class="timeline-empty">暂无历史任务</div>';
+}
+
+function toggleTimelineEntry(idx) {
+  var entry = historyData[idx];
+  if (!entry) return;
+  openTaskModal({
+    type: 'history',
+    title: entry.userRequirement || '（无描述）',
+    meta: getAgentLabel(entry.agent) + ' · 完成时间：' + formatTime(entry.completedAt),
+    tasks: entry.tasks || []
+  });
+}
+
+function formatTimelineDate(ts) {
+  var date = parseTimestamp(ts);
+  if (!date) return null;
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  return date.getFullYear() + '-' + pad(date.getMonth()+1) + '-' + pad(date.getDate());
+}
+
+function getTimeValue(ts) {
+  var date = parseTimestamp(ts);
+  return !date ? 0 : date.getTime();
+}
+
+function statusLabel(status) {
+  return status === 'done' ? '已完成'
+    : status === 'blocked' ? '阻塞'
+    : status === 'error' ? '失败'
+    : status === 'incomplete' ? '进行中'
+    : '其他';
+}
+
+function renderTimelineTaskChips(tasks) {
+  if (!tasks || tasks.length === 0) return '';
+  return tasks.slice(0, 3).map(function(t) {
+    var cls = t.status === 'completed' ? 'done' : t.status === 'blocked' ? 'blocked' : 'default';
+    return '<span class="timeline-task-chip ' + cls + '">' + esc(t.name || '未命名') + '</span>';
+  }).join('');
+}
+function syncSavedDeptSelection(key, allIds, options) {
+  options = options || {};
+  var includeNewAgents = options.includeNewAgents !== false;
+  var raw = localStorage.getItem(key);
+  var saved = [];
+  if (raw) {
+    try { saved = JSON.parse(raw); } catch(e) { saved = []; }
+  }
+  if (!Array.isArray(saved) || saved.length === 0) return allIds.slice();
+  var valid = saved.filter(function(id) { return allIds.indexOf(id) >= 0; });
+  if (includeNewAgents) {
+    var missing = allIds.filter(function(id) { return valid.indexOf(id) < 0; });
+    if (missing.length > 0) {
+      valid = valid.concat(missing);
+      localStorage.setItem(key, JSON.stringify(valid));
+    }
+  }
+  return valid;
+}
+
+function historyDeptInitCheckboxes() {
+  var container = document.getElementById('history-dept-filter-items');
+  if (!container) return;
+  var deptAgents = getDeptAgents();
+  var agentIds = deptAgents.map(function(a) { return a.id; });
+  var hasExistingCheckboxes = container.children.length > 0;
+  var saved = hasExistingCheckboxes
+    ? historyDeptGetSelected().filter(function(id) { return agentIds.indexOf(id) >= 0; })
+    : syncSavedDeptSelection(HISTORY_DEPT_FILTER_KEY, agentIds, { includeNewAgents: false });
+  if (!hasExistingCheckboxes && saved.length === 0) {
+    saved = agentIds.slice();
+  }
+  container.innerHTML = '';
+  deptAgents.forEach(function(a) {
+    var checked = saved.indexOf(a.id) >= 0;
+    var label = document.createElement('label');
+    label.className = 'dept-checkbox-item';
+    label.innerHTML = '<input type="checkbox" value="' + a.id + '"' + (checked ? ' checked' : '') + '><span>' + a.label + '</span>';
+    label.querySelector('input').addEventListener('change', historyApplyFilters);
+    container.appendChild(label);
+  });
+}
+
+// ── 服务详情弹窗 ──────────────────────────────────────────────────────────────
+var _servicesData = [];
+
+function openServiceDetail(idx) {
+  var svc = _servicesData[idx];
+  if (!svc) return;
+  var status = (svc.status || 'unknown').toLowerCase();
+  var statusCls = 'service-status-' + status;
+  var statusLabel = status === 'running' ? '运行中' : status === 'stopped' ? '已停止' : '未知';
+  var statusHtml = '<span class="service-status ' + statusCls + '"><span class="service-status-dot"></span>' + statusLabel + '</span>';
+
+  document.getElementById('svc-detail-name').textContent = svc.name;
+
+  var rows = '';
+
+  // 描述
+  rows += row('描述', esc(svc.description || '-'));
+  // 状态
+  rows += '<div class="svc-detail-label">状态</div><div class="svc-detail-value">' + statusHtml + '</div>';
+  // 端口
+  rows += row('端口（宿主机）', esc(String(svc.port || '-')));
+  // 类型
+  var typeCls = svc.type === 'docker' ? 'service-type-docker' : 'service-type-host';
+  rows += '<div class="svc-detail-label">类型</div><div class="svc-detail-value"><span class="service-type ' + typeCls + '">' + esc(svc.type || '-') + '</span></div>';
+
+  // Docker 信息（仅 docker 类型）
+  if (svc.type === 'docker') {
+    rows += '<hr class="svc-detail-divider">';
+    rows += row('容器名', esc(svc.dockerContainer || '-'));
+    rows += row('Docker 内部端口', esc(svc.dockerPort || '-'));
+  }
+
+  rows += '<hr class="svc-detail-divider">';
+
+  // 配置文件（可复制）
+  var cfPath = svc.configFile || '';
+  rows += '<div class="svc-detail-label">配置文件</div><div class="svc-detail-value">' + copyableValue(cfPath) + '</div>';
+
+  // 启动命令（可复制）
+  var cmd = svc.startCommand || '';
+  rows += '<div class="svc-detail-label">启动命令</div><div class="svc-detail-value">' + copyableValue(cmd) + '</div>';
+
+  rows += '<hr class="svc-detail-divider">';
+
+  // 启动时间（running 时显示）
+  if (status === 'running' && svc.startTime) {
+    rows += row('启动时间', esc(svc.startTime));
+  }
+
+  // PID
+  rows += row('PID', esc(String(svc.pid || '-')));
+
+  // 注册时间
+  rows += row('注册时间', esc(svc.registeredAt || svc.createdAt || '-'));
+
+  document.getElementById('svc-detail-grid').innerHTML = rows;
+  document.getElementById('svc-detail-overlay').classList.remove('hidden');
+}
+
+function row(label, valueHtml) {
+  return '<div class="svc-detail-label">' + esc(label) + '</div><div class="svc-detail-value">' + valueHtml + '</div>';
+}
+
+function copyableValue(val) {
+  if (!val) return '<sp="color:#475569">-</span>';
+  var escaped = esc(val);
+  var jsonVal = JSON.stringify(val);
+  return '<span class="svc-detail-copy">' +
+    '<span class="svc-detail-copy-text" style="font-family:monospace;font-size:12px;color:#94a3b8;word-break:break-all">' + escaped + '</span>' +
+    '<button class="svc-detail-copy-btn" onclick="copySvcValue(' + jsonVal + ', this)">复制</button>' +
+  '</span>';
+}
+
+function copySvcValue(val, btn) {
+  navigator.clipboard.writeText(val).then(function() {
+    var orig = btn.textContent;
+    btn.textContent = '已复制';
+    btn.style.color = '#4ade80';
+    setTimeout(function() { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  }).catch(function() {
+    showToast('复制失败', 'err');
+  });
+}
+
+function closeSvcDetail(e) {
+  if (e.target === document.getElementById('svc-detail-overlay')) {
+    document.getElementById('svc-detail-overlay').classList.add('hidden');
+  }
+}
+
+</script>
+</body>
+</html>

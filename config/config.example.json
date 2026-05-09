@@ -1,0 +1,15 @@
+{
+  "base_dir": "/path/to/your/project",
+  "agents": [
+    { "name": "Agent 1", "id": "agent1", "workSpace": "/path/to/your/project/workspace-agent1" },
+    { "name": "Agent 2", "id": "agent2", "workSpace": "/path/to/your/project/workspace-agent2" }
+  ],
+  "dashboard": {
+    "port": 3010
+  },
+  "vector_memory": {
+    "enabled": false,
+    "service_url": "http://localhost:3019",
+    "skill_path": ""
+  }
+}

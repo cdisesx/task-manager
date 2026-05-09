@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>琅琊阁 · 代理详情</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .back-btn { background: #2d3148; border: none; color: #c4b5fd; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .back-btn:hover { background: #374151; }
+  header h1 { font-size: 18px; font-weight: 600; color: #a78bfa; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .status-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+  .status-active { background: #14532d; color: #4ade80; }
+  .status-idle { background: #1e293b; color: #64748b; }
+  .btn-wake { background: #7c3aed; color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-wake:hover { opacity: .85; }
+  .btn-wake:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  .btn-wake.waking { background: #1e3a5f; color: #60a5fa; }
+  .btn-wake.woke { background: #14532d; color: #4ade80; }
+  main { padding: 24px; max-width: 900px; margin: 0 auto; }
+  .section-title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; margin-top: 28px; }
+  .req-box { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #94a3b8; line-height: 1.6; }
+  .progress-summary { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 20px; flex: 1; min-width: 100px; text-align: center; }
+  .stat-num { font-size: 28px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: #64748b; margin-top: 4px; }
+  .num-done { color: #4ade80; }
+  .num-run  { color: #60a5fa; }
+  .num-pending { color: #94a3b8; }
+  .num-total { color: #a78bfa; }
+  .progress-bar-wrap { background: #1a1d2e; border-radius: 8px; height: 10px; margin-bottom: 24px; overflow: hidden; border: 1px solid #2d3148; }
+  .progress-bar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #7c3aed, #a78bfa); transition: width .6s; }
+  /* Timeline */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #2d3148; }
+  .tl-item { position: relative; margin-bottom: 16px; }
+  .tl-dot { position: absolute; left: -22px; top: 14px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid; }
+  .tl-dot-done    { background: #14532d; border-color: #4ade80; }
+  .tl-dot-run     { background: #1e3a5f; border-color: #60a5fa; box-shadow: 0 0 6px #60a5fa88; }
+  .tl-dot-pending { background: #1e293b; border-color: #475569; }
+  .tl-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 16px; }
+  .tl-card:hover { border-color: #4b5563; }
+  .tl-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .tl-name { font-size: 14px; font-weight: 500; flex: 1; }
+  .tl-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .tl-status-done    { background: #14532d; color: #4ade80; }
+  .tl-status-run     { background: #1e3a5f; color: #60a5fa; }
+  .tl-status-pending { background: #1e293b; color: #94a3b8; }
+  .tl-desc { font-size: 12px; color: #64748b; margin-bottom: 8px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+  .tl-summary { font-size: 12px; color: #94a3b8; background: #0f1117; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+  .tl-times { display: flex; gap: 16px; flex-wrap: wrap; }
+  .tl-time { font-size: 11px; color: #475569; }
+  .tl-time span { color: #64748b; }
+  /* workLog */
+  .wl-section { margin-top: 10px; border-top: 1px solid #2d3148; padding-top: 8px; }
+  .wl-title { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .wl-item { background: #0a0d14; border: 1px solid #1e2235; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+  .wl-item:last-child { margin-bottom: 0; }
+  .wl-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .wl-action { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; background: #1e3a5f; color: #60a5fa; text-transform: uppercase; }
+  .wl-time { font-size: 10px; color: #475569; margin-left: auto; }
+  .wl-content { font-size: 12px; color: #94a3b8; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+  .wl-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .wl-file { font-size: 10px; color: #a78bfa; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 3px; padding: 1px 6px; font-family: monospace; }
+  /* Archives */
+  .archive-list { display: flex; flex-direction: column; gap: 10px; }
+  .archive-item { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 12px 16px; }
+  .archive-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .archive-date { font-size: 12px; color: #a78bfa; font-weight: 500; }
+  .archive-count { font-size: 11px; color: #64748b; }
+  .archive-tasks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .archive-chip { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #0f1117; color: #94a3b8; border: 1px solid #2d3148; }
+  .empty { text-align: center; color: #475569; padding: 40px 0; font-size: 14px; }
+  /* Tabs */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 24px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 4px; }
+  .tab-btn { flex: 1; padding: 8px 0; border: none; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; background: transparent; color: #64748b; transition: all .2s; }
+  .tab-btn.active { background: #7c3aed; color: #fff; }
+  .tab-btn:hover:not(.active) { background: #2d3148; color: #c4b5fd; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  /* History */
+  .search-bar { width: 100%; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 14px; color: #e2e8f0; font-size: 13px; margin-bottom: 16px; outline: none; }
+  .search-bar:focus { border-color: #7c3aed; }
+  .hist-list { display: flex; flex-direction: column; gap: 10px; }
+  .hist-item { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; overflow: hidden; }
+  .hist-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; user-select: none; }
+  .hist-header:hover { background: #1e2235; }
+  .hist-name { flex: 1; font-size: 14px; font-weight: 500; color: #e2e8f0; }
+  .hist-meta { font-size: 11px; color: #64748b; white-space: nowrap; }
+  .hist-count { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #2d3148; color: #a78bfa; white-space: nowrap; }
+  .hist-arrow { font-size: 11px; color: #475569; transition: transform .2s; }
+  .hist-item.open .hist-arrow { transform: rotate(90deg); }
+  .hist-body { display: none; border-top: 1px solid #2d3148; padding: 12px 16px; }
+  .hist-item.open .hist-body { display: block; }
+  .hist-req { font-size: 12px; color: #64748b; margin-bottom: 10px; line-height: 1.5; }
+  .hist-subtasks { display: flex; flex-direction: column; gap: 6px; }
+  .hist-sub { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; background: #0f1117; border-radius: 6px; }
+  .hist-sub-name { flex: 1; font-size: 12px; color: #94a3b8; }
+  .hist-sub-status { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; white-space: nowrap; }
+  .hist-sub-status-done { background: #14532d; color: #4ade80; }
+  .hist-sub-status-other { background: #1e293b; color: #64748b; }
+  .hist-sub-time { font-size: 10px; color: #475569; white-space: nowrap; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 12px 18px; font-size: 13px; color: #e2e8f0; z-index: 999; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok { border-color: #22c55e; color: #4ade80; }
+  .toast.err { border-color: #ef4444; color: #f87171; }
+</style>
+</head>
+<body>
+<header>
+  <button class="back-btn" onclick="history.back()">← 返回</button>
+  <h1 id="agent-title">代理详情</h1>
+  <div class="header-right">
+    <span class="status-badge" id="status-badge">加载中</span>
+    <button class="btn-wake" id="wake-btn" onclick="wakeAgent()">唤醒</button>
+  </div>
+</header>
+<div style="max-width:900px;margin:0 auto;padding:24px 24px 0">
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-active" onclick="switchTab('active')">进行中</button>
+    <button class="tab-btn" id="tab-history" onclick="switchTab('history')">历史归档</button>
+  </div>
+</div>
+<div class="tab-panel active" id="panel-active">
+  <main id="main"><div class="empty">加载中…</div></main>
+</div>
+<div class="tab-panel" id="panel-history">
+  <div style="max-width:900px;margin:0 auto;padding:0 24px 24px">
+    <input class="search-bar" id="hist-search" placeholder="🔍 搜索历史任务名…" oninput="filterHistory()" />
+    <div class="hist-list" id="hist-list"><div class="empty">加载中…</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const AGENT_LABELS = {
+  changlinjun: '长林军 🗡️',
+  chiyanjun:   '赤焰军 🔥',
+  langyage:    '琅琊阁 🏯',
+  // taizi removed
+};
+
+const params = new URLSearchParams(location.search);
+const agentId = params.get('agent') || '';
+const sessionId = params.get('sessionId') || '';
+
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => t.className = 'toast', 3500);
+}
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d)) return ts;
+    return d.toLocaleString('zh-CN', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch { return ts; }
+}
+
+function statusLabel(s) {
+  if (s === 'completed') return ['DONE', 'tl-status-done', 'tl-dot-done'];
+  if (s === 'in_progress') return ['RUN', 'tl-status-run', 'tl-dot-run'];
+  return ['PENDING', 'tl-status-pending', 'tl-dot-pending'];
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderWorkLog(wl) {
+  if (!wl || wl.length === 0) return '';
+  const items = wl.map(w => {
+    const wTime = w.createdAt || w.time || w.timestamp || '';
+    const wAction = w.action || w.type || '';
+    const wContent = w.content || w.result || w.message || '';
+    const wFiles = w.files || w.relatedFiles || [];
+    const filesHtml = wFiles.length > 0
+      ? `<div class="wl-files">${wFiles.map(f => `<span class="wl-file">${escHtml(f)}</span>`).join('')}</div>`
+      : '';
+    return `<div class="wl-item">
+      <div class="wl-item-header">
+        ${wAction ? `<span class="wl-action">${escHtml(wAction)}</span>` : ''}
+        ${wTime ? `<span class="wl-time">${fmtTime(wTime)}</span>` : ''}
+      </div>
+      ${wContent ? `<div class="wl-content">${escHtml(wContent)}</div>` : ''}
+      ${filesHtml}
+    </div>`;
+  }).join('');
+  return `<div class="wl-section"><div class="wl-title">📋 Work Log (${wl.length})</div>${items}</div>`;
+}
+
+function renderTimeline(tasks) {
+  if (!tasks || tasks.length === 0) return '<div class="empty">暂无任务</div>';
+  return tasks.map(t => {
+    const [slabel, scls, dotcls] = statusLabel(t.status);
+    const desc = t.description ? `<div class="tl-desc">${t.description}</div>` : '';
+    const summary = t.summary ? `<div class="tl-summary">📝 ${t.summary}</div>` : '';
+    const times = `
+      <div class="tl-times">
+        <div class="tl-time"><span>创建</span> ${fmtTime(t.createdAt)}</div>
+        ${t.startedAt || t.updatedAt ? `<div class="tl-time"><span>开始</span> ${fmtTime(t.startedAt || t.updatedAt)}</div>` : ''}
+        ${t.completedAt ? `<div class="tl-time"><span>完成</span> ${fmtTime(t.completedAt)}</div>` : ''}
+      </div>`;
+    const workLog = renderWorkLog(t.workLog || t.work_log || []);
+    return `
+    <div class="tl-item">
+      <div class="tl-dot ${dotcls}"></div>
+      <div class="tl-card">
+        <div class="tl-header">
+          <span class="tl-name">${t.name || t.title || '(无标题)'}</span>
+          <span class="tl-status ${scls}">${slabel}</span>
+        </div>
+        ${desc}${summary}${times}${workLog}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Tab 切换 ──────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tab-active').classList.toggle('active', tab === 'active');
+  document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+  document.getElementById('panel-active').classList.toggle('active', tab === 'active');
+  document.getElementById('panel-history').classList.toggle('active', tab === 'history');
+  if (tab === 'history' && !window._histLoaded) loadHistory();
+}
+
+// ── 历史归档 ──────────────────────────────────────────
+let _histData = [];
+
+function fmtHistTime(ts) {
+  if (!ts) return '—';
+  // 支持 "20260331_031716" 格式
+  const m = String(ts).match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+  return fmtTime(ts);
+}
+
+function renderHistItem(item, idx) {
+  const req = item.userRequirement ? `<div class="hist-req">📋 ${item.userRequirement}</div>` : '';
+  const subs = (item.tasks || []).map(t => {
+    const done = t.status === 'completed';
+    const scls = done ? 'hist-sub-status-done' : 'hist-sub-status-other';
+    const slabel = done ? 'DONE' : (t.status || 'PENDING').toUpperCase().substring(0, 7);
+    const ct = t.completedAt ? fmtTime(t.completedAt) : (t.updatedAt ? fmtTime(t.updatedAt) : '');
+    return `<div class="hist-sub">
+      <span class="hist-sub-name">${t.name || t.title || '(无标题)'}</span>
+      <span class="hist-sub-status ${scls}">${slabel}</span>
+      ${ct ? `<span class="hist-sub-time">${ct}</span>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="hist-item" id="hist-item-${idx}">
+    <div class="hist-header" onclick="toggleHist(${idx})">
+      <span class="hist-name">${item.userRequirement || item.fileName || '(无标题)'}</span>
+      <span class="hist-meta">${fmtHistTime(item.completedAt)}</span>
+      <span class="hist-count">${(item.tasks || []).length} 个子任务</span>
+      <span class="hist-arrow">▶</span>
+    </div>
+    <div class="hist-body">${req}<div class="hist-subtasks">${subs || '<div class="empty" style="padding:12px 0">无子任务记录</div>'}</div></div>
+  </div>`;
+}
+
+function toggleHist(idx) {
+  document.getElementById('hist-item-' + idx).classList.toggle('open');
+}
+
+function filterHistory() {
+  const kw = (document.getElementById('hist-search').value || '').trim().toLowerCase();
+  const filtered = kw
+    ? _histData.filter(h => (h.userRequirement || h.fileName || '').toLowerCase().includes(kw))
+    : _histData;
+  document.getElementById('hist-list').innerHTML =
+    filtered.length ? filtered.map((h, i) => renderHistItem(h, i)).join('') : '<div class="empty">无匹配记录</div>';
+}
+
+async function loadHistory() {
+  window._histLoaded = true;
+  try {
+    const res = await fetch(`/api/agents/${agentId}/history`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    _histData = data.history || [];
+    filterHistory();
+  } catch (e) {
+    document.getElementById('hist-list').innerHTML = `<div class="empty">加载失败: ${e.message}</div>`;
+  }
+}
+
+async function loadData() {
+  if (!agentId) { document.getElementById('main').innerHTML = '<div class="empty">未指定代理</div>'; return; }
+  try {
+    const label = AGENT_LABELS[agentId] || agentId;
+
+    // 若有 sessionId，从 task-groups 接口获取该 session 数据
+    if (sessionId) {
+      const grpRes = await fetch('/api/task-groups');
+      const grpData = await grpRes.json();
+      if (!grpData.ok) throw new Error(grpData.error);
+      const grp = (grpData.groups || []).find(g => g.sessionId === sessionId);
+      if (!grp) {
+        document.getElementById('main').innerHTML = '<div class="empty">未找到该 session 的任务数据</div>';
+        document.title = label + ' · ' + sessionId.substring(0, 8);
+        document.getElementById('agent-title').textContent = label + ' · ' + sessionId.substring(0, 8);
+        return;
+      }
+      const tasks = grp.tasks || [];
+      const done = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
+      const running = tasks.filter(t => t.status === 'in_progress').length;
+      const pending = tasks.filter(t => t.status === 'pending').length;
+      const blocked = tasks.filter(t => t.status === 'blocked').length;
+      const total = tasks.length;
+      const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+      document.title = label + ' · ' + sessionId.substring(0, 8);
+      document.getElementById('agent-title').textContent = label + ' · ' + sessionId.substring(0, 8);
+      const active = running > 0;
+      const badge = document.getElementById('status-badge');
+      badge.textContent = active ? '● 执行中' : '○ 待命';
+      badge.className = 'status-badge ' + (active ? 'status-active' : 'status-idle');
+
+      document.getElementById('main').innerHTML = `
+        <div class="section-title">任务需求</div>
+        <div class="req-box">${grp.userRequirement || grp.description || '暂无任务需求'}</div>
+        <div class="section-title">进度总览</div>
+        <div class="progress-summary">
+          <div class="stat-card"><div class="stat-num num-total">${total}</div><div class="stat-label">总任务</div></div>
+          <div class="stat-card"><div class="stat-num num-done">${done}</div><div class="stat-label">已完成</div></div>
+          <div class="stat-card"><div class="stat-num num-run">${running}</div><div class="stat-label">执行中</div></div>
+          <div class="stat-card"><div class="stat-num num-pending">${pending}</div><div class="stat-label">待处理</div></div>
+          ${blocked > 0 ? `<div class="stat-card"><div class="stat-num" style="color:#f59e0b">${blocked}</div><div class="stat-label">阻塞</div></div>` : ''}
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+        <div class="section-title">任务时间轴</div>
+        <div class="timeline">${renderTimeline(tasks)}</div>
+      `;
+      return;
+    }
+
+    // 无 sessionId：原有逻辑，显示代理全部任务
+    const res = await fetch(`/api/agents/${agentId}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    const a = data.agent;
+    document.title = `${label} · 详情`;
+    document.getElementById('agent-title').textContent = label;
+
+    const active = a.tasks.some(t => t.status === 'in_progress');
+    const badge = document.getElementById('status-badge');
+    badge.textContent = active ? '● 执行中' : '○ 待命';
+    badge.className = 'status-badge ' + (active ? 'status-active' : 'status-idle');
+
+    const p = a.progress;
+    document.getElementById('main').innerHTML = `
+      <div class="section-title">任务需求</div>
+      <div class="req-box">${a.userRequirement || '暂无任务需求'}</div>
+
+      <div class="section-title">进度总览</div>
+      <div class="progress-summary">
+        <div class="stat-card"><div class="stat-num num-total">${p.total}</div><div class="stat-label">总任务</div></div>
+        <div class="stat-card"><div class="stat-num num-done">${p.done}</div><div class="stat-label">已完成</div></div>
+        <div class="stat-card"><div class="stat-num num-run">${p.running}</div><div class="stat-label">执行中</div></div>
+    <div class="stat-card"><div class="stat-num num-pending">${p.pending}</div><div class="stat-label">待处理</div></div>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${p.pct}%"></div></div>
+
+      <div class="section-title">任务时间轴</div>
+      <div class="timeline">${renderTimeline(a.tasks)}</div>
+
+    `;
+  } catch (e) {
+    document.getElementById('main').innerHTML = `<div class="empty">加载失败: ${e.message}</div>`;
+  }
+}
+
+async function wakeAgent() {
+  const btn = document.getElementById('wake-btn');
+  btn.disabled = true;
+  btn.className = 'btn-wake waking';
+  btn.textContent = '派遣中…';
+  try {
+    const res = await fetch(`/api/wake/${agentId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      btn.className = 'btn-wake woke';
+      btn.textContent = '已派遣';
+      showToast('✅ 已派遣，等待回奏', 'ok');
+      setTimeout(() => { btn.disabled = false; btn.className = 'btn-wake'; btn.textContent = '唤醒'; }, 5000);
+    } else {
+      throw new Error(data.error || '唤醒失败');
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.className = 'btn-wake';
+    btn.textContent = '唤醒';
+    showToast(`❌ 唤醒失败: ${e.message}`, 'err');
+  }
+}
+
+loadData();
+// 30s 自动刷新
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>

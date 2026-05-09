@@ -1,0 +1,13 @@
+
+__pycache__/
+.pytest_cache/
+*.pyc
+node_modules/
+
+.claude/
+.venv/
+.idea/
+
+workspace/
+config/config.json
+logs/*.log
